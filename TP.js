@@ -6,13 +6,28 @@ import {GUI} from "/node_modules/three/examples/jsm/libs/lil-gui.module.min.js  
 import {FBXLoader} from "/node_modules/three/examples/jsm/loaders/FBXLoader.js";
 import {MTLLoader} from "/node_modules/three/examples/jsm/loaders/MTLLoader.js";
 import {OBJLoader} from "/node_modules/three/examples/jsm/loaders/OBJLoader.js";
-import {Clock} from "three";
+import {Clock, Object3D, Vector3} from "three";
 
 let sun, clock, renderer, camera, cameraControls
+let cameraTarget = new THREE.Vector3()
+const keyStates = {};
+document.addEventListener('keydown', (event) => {
+
+    keyStates[event.code] = true;
+});
+
+document.addEventListener('keyup', (event) => {
+
+    keyStates[event.code] = false;
+
+});
+const playerDirection = new THREE.Vector3();
+const playerVelocity = new THREE.Vector3(0, 0, 0);
 let animationActions = []
 let character
 let mixer, tPose, forwardWalk, backwardWalk, leftWalk, rightWalk
 let switche = 0
+let deltaTime
 
 let scene = new THREE.Scene()
 clock = new THREE.Clock()
@@ -53,7 +68,6 @@ function init() {
             // ClipAction est un ensemble d'attributs et de sous fonctions utile à l'animation 3D de l'objet, puis qu'on range dans un tableau.
 
             const actions = mixer.clipAction(anim.animations[0]);
-            console.log(actions)
             animationActions.push(actions)
 
         })
@@ -61,7 +75,6 @@ function init() {
         object.scale.set(scale, scale, scale);
         character = object
         scene.add(object);
-        console.log(object)
 
     });
 
@@ -87,7 +100,6 @@ function init() {
             });
 
             // scenesMeshes.push(m)
-            console.log(object)
             scene.add(object)
         })
     });*/
@@ -144,7 +156,6 @@ function init() {
 
     let ambiant = new THREE.AmbientLight('white')
     scene.add(ambiant)
-    console.log(ambiant)
 
 
     const geometry = new THREE.BoxGeometry();
@@ -161,6 +172,8 @@ function init() {
 
 init()
 
+
+
 camera.position.z = 5;
 
 function onWindowResize() {
@@ -172,7 +185,109 @@ function onWindowResize() {
 }
 
 
+document.addEventListener("keydown", onDocumentKeyDown, false);
+document.addEventListener("keyup", onDocumentKeyUp, false);
+
+function onDocumentKeyDown(event) {
+    let keyCode = event.which;
+    if (keyCode === 0x0D) {
+        console.log(character);
+    }
+    if (keyCode === 90) {
+        animationActions[0].play()
+    }
+
+}
+function onDocumentKeyUp(event) {
+    let keyCode = event.which;
+    if (keyCode === 0x0D) {
+        console.log(character);
+    }
+    if (keyCode === 90) {
+        animationActions[0].stop()
+
+    }
+
+}
+
+
+function getForwardVector() {
+
+    camera.getWorldDirection(playerDirection);
+    playerDirection.y = 0;
+    playerDirection.normalize();
+
+    return playerDirection;
+
+}
+
+function getSideVector() {
+
+    camera.getWorldDirection(playerDirection);
+    playerDirection.y = 0;
+    playerDirection.normalize();
+    playerDirection.cross(camera.up);
+
+    return playerDirection;
+
+}
+
+function controls(deltaTime) {
+    const speedDelta = 1
+    playerVelocity.set(0,0,0)
+    // gives a bit of air control
+
+    if (keyStates['KeyW']) {
+
+        playerVelocity.add(getForwardVector().multiplyScalar(speedDelta));
+        console.log(playerVelocity)
+
+    }
+
+    if (keyStates['KeyS']) {
+
+        playerVelocity.add(getForwardVector().multiplyScalar(-speedDelta));
+
+    }
+
+    if (keyStates['KeyA']) {
+
+        playerVelocity.add(getSideVector().multiplyScalar(-speedDelta));
+
+    }
+
+    if (keyStates['KeyD']) {
+
+        playerVelocity.add(getSideVector().multiplyScalar(speedDelta));
+
+    }
+
+
+}
+
+function updatePlayer(deltaTime) {
+
+
+    playerVelocity.add(playerVelocity);
+
+    const deltaPosition = playerVelocity.clone().multiplyScalar(deltaTime*5);
+
+    character.position.add(deltaPosition);
+    camera.position.add(deltaPosition)
+    cameraTarget.x = character.position.x
+    cameraTarget.y = character.position.y + 1
+    cameraTarget.z = character.position.z
+    cameraControls.target = cameraTarget
+    character.lookAt(new THREE.Vector3(0,0,0))
+
+}
+
 function animate() {
+    deltaTime = clock.getDelta()
+    if (character) {
+        controls()
+        updatePlayer(deltaTime)
+    }
     requestAnimationFrame(animate)
     renderer.render(scene, camera)
 
@@ -180,32 +295,9 @@ function animate() {
 
     //calculate objects intersecting the picking ray
 
-    mixer.update(clock.getDelta())
+    mixer.update(deltaTime)
     // console.log(intersects[0]);
 }
-
-
-document.addEventListener("keydown", onDocumentKeyDown, false);
-
-function onDocumentKeyDown(event) {
-    let keyCode = event.which;
-    if (keyCode === 0x0D) {
-        console.log(character);
-    }
-    if (keyCode === 32) {
-        if (switche === 0) {
-            console.log("switche est " + switche)
-            switche = 1
-            animationActions[0].play()
-        } else {
-            console.log("switche est " + switche)
-            switche = 0
-            animationActions[0].stop()
-        }
-    }
-
-}
-
 
 animate()
 
