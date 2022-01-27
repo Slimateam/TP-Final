@@ -6,26 +6,18 @@ import {GUI} from "/node_modules/three/examples/jsm/libs/lil-gui.module.min.js  
 import {FBXLoader} from "/node_modules/three/examples/jsm/loaders/FBXLoader.js";
 import {MTLLoader} from "/node_modules/three/examples/jsm/loaders/MTLLoader.js";
 import {OBJLoader} from "/node_modules/three/examples/jsm/loaders/OBJLoader.js";
+import {Octree} from "/node_modules/three/examples/jsm/math/Octree.js";
 import {Clock, Object3D, Vector3} from "three";
 
 let sun, clock, renderer, camera, cameraControls
 let cameraTarget = new THREE.Vector3()
 const keyStates = {};
-document.addEventListener('keydown', (event) => {
-
-    keyStates[event.code] = true;
-});
-
-document.addEventListener('keyup', (event) => {
-
-    keyStates[event.code] = false;
-
-});
+const world = new Octree()
 const playerDirection = new THREE.Vector3();
 const playerVelocity = new THREE.Vector3(0, 0, 0);
 let animationActions = []
 let character
-let mixer, tPose, forwardWalk, backwardWalk, leftWalk, rightWalk
+let mixer, tPose, forwardWalk, backwardWalk, leftWalk, rightWalk, activeAnimation
 let switche = 0
 let deltaTime
 
@@ -39,6 +31,10 @@ function init() {
     renderer = new THREE.WebGLRenderer();
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputEncoding = THREE.sRGBEncoding;
     document.body.appendChild(renderer.domElement);
 
 // Configuration cameras
@@ -67,18 +63,45 @@ function init() {
 
             // ClipAction est un ensemble d'attributs et de sous fonctions utile à l'animation 3D de l'objet, puis qu'on range dans un tableau.
 
-            const actions = mixer.clipAction(anim.animations[0]);
+            const forwardWalk = mixer.clipAction(anim.animations[0]);
+            animationActions.push(forwardWalk)
+
+        })
+        const anim2 = new FBXLoader();
+        anim2.load('/animation/Character@LeftStrafeWalk.fbx', (anim) => {
+
+            let actions = mixer.clipAction(anim.animations[0]);
+            animationActions.push(actions)
+
+        })
+        const anim3 = new FBXLoader();
+        anim3.load('/animation/Character@WalkStrafeRight.fbx', (anim) => {
+
+            let actions = mixer.clipAction(anim.animations[0]);
+            animationActions.push(actions)
+
+        })
+        const anim4 = new FBXLoader();
+        anim4.load('/animation/Character@WalkingBackwards.fbx', (anim) => {
+
+            let actions = mixer.clipAction(anim.animations[0]);
             animationActions.push(actions)
 
         })
         let scale = 0.03
         object.scale.set(scale, scale, scale);
+        object.traverse(function (child) {
+            if (child instanceof THREE.Mesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        })
         character = object
         scene.add(object);
 
     });
 
-    /*const mtlLoader = new MTLLoader()
+    const mtlLoader = new MTLLoader()
     mtlLoader.load("./Animation/final.mtl", function (materials) {
         materials.preload();
         const axesHelper = new THREE.AxesHelper(20);
@@ -101,8 +124,9 @@ function init() {
 
             // scenesMeshes.push(m)
             scene.add(object)
+            // world.fromGraphNode(object.scene);
         })
-    });*/
+    });
 // Add Sky
     let sky = new Sky();
     sky.scale.setScalar(450000);
@@ -154,24 +178,28 @@ function init() {
 
     guiChanged();
 
-    let ambiant = new THREE.AmbientLight('white')
+    let ambiant = new THREE.AmbientLight('white', 0.1)
+    let spotLight = new THREE.SpotLight(0xe6a06d, 1);
+    spotLight.position.set(50, 60, -20);
+    spotLight.angle = Math.PI / 3;
+    spotLight.penumbra = 0.1;
+    spotLight.decay = 2;
+    spotLight.distance = 200;
+    // spotLight.intensity = 0.1;
+
+    spotLight.castShadow = true;
+    spotLight.shadow.mapSize.width = 512;
+    spotLight.shadow.mapSize.height = 512;
+    spotLight.shadow.camera.near = 1;
+    spotLight.shadow.camera.far = 200;
+    spotLight.shadow.focus = 1;
+    scene.add(spotLight);
+    let lightHelper = new THREE.SpotLightHelper(spotLight);
+    scene.add(lightHelper);
     scene.add(ambiant)
-
-
-    const geometry = new THREE.BoxGeometry();
-    const material = new THREE.MeshBasicMaterial({color: 0x00ff00});
-    const cube = new THREE.Mesh(geometry, material);
-    scene.add(cube);
-
-    const geometry2 = new THREE.PlaneGeometry(10, 10);
-    const material2 = new THREE.MeshBasicMaterial({color: 'red', side: THREE.DoubleSide});
-    const plane = new THREE.Mesh(geometry2, material2);
-    plane.rotation.x = -Math.PI / 2;
-    scene.add(plane);
 }
 
 init()
-
 
 
 camera.position.z = 5;
@@ -188,24 +216,55 @@ function onWindowResize() {
 document.addEventListener("keydown", onDocumentKeyDown, false);
 document.addEventListener("keyup", onDocumentKeyUp, false);
 
+document.addEventListener('keydown', (event) => {
+
+    keyStates[event.code] = true;
+});
+
+document.addEventListener('keyup', (event) => {
+
+    keyStates[event.code] = false;
+
+});
+
 function onDocumentKeyDown(event) {
     let keyCode = event.which;
     if (keyCode === 0x0D) {
-        console.log(character);
     }
     if (keyCode === 90) {
         animationActions[0].play()
+        activeAnimation = 0
+    }
+    if (keyCode === 68) {
+        animationActions[2].play()
+        activeAnimation = 2
+    }
+    if (keyCode === 81) {
+        animationActions[1].play()
+        activeAnimation = 1
+    }
+    if (keyCode === 83) {
+        animationActions[3].play()
+        activeAnimation = 3
     }
 
 }
+
 function onDocumentKeyUp(event) {
     let keyCode = event.which;
     if (keyCode === 0x0D) {
-        console.log(character);
     }
     if (keyCode === 90) {
         animationActions[0].stop()
-
+    }
+    if (keyCode === 68) {
+        animationActions[2].stop()
+    }
+    if (keyCode === 81) {
+        animationActions[1].stop()
+    }
+    if (keyCode === 83) {
+        animationActions[3].play()
     }
 
 }
@@ -232,15 +291,28 @@ function getSideVector() {
 
 }
 
+function getUpVector() {
+
+    let upVector = new THREE.Vector3(0, 5, 0)
+    return upVector
+
+}
+
+function getDownVector() {
+
+    let downVector = new THREE.Vector3(0, -5, 0)
+    return downVector
+
+}
+
 function controls(deltaTime) {
     const speedDelta = 1
-    playerVelocity.set(0,0,0)
+    playerVelocity.set(0, 0, 0)
     // gives a bit of air control
 
     if (keyStates['KeyW']) {
 
         playerVelocity.add(getForwardVector().multiplyScalar(speedDelta));
-        console.log(playerVelocity)
 
     }
 
@@ -261,16 +333,26 @@ function controls(deltaTime) {
         playerVelocity.add(getSideVector().multiplyScalar(speedDelta));
 
     }
+    if (keyStates['Space']) {
+
+        playerVelocity.add(getUpVector().multiplyScalar(speedDelta));
+
+    }
+    if (keyStates['ShiftLeft']) {
+
+        playerVelocity.add(getDownVector().multiplyScalar(speedDelta));
+
+    }
 
 
 }
 
 function updatePlayer(deltaTime) {
 
-
+    // const result = world.capsuleIntersect(character);
     playerVelocity.add(playerVelocity);
 
-    const deltaPosition = playerVelocity.clone().multiplyScalar(deltaTime*5);
+    const deltaPosition = playerVelocity.clone().multiplyScalar(deltaTime * 5);
 
     character.position.add(deltaPosition);
     camera.position.add(deltaPosition)
@@ -278,8 +360,6 @@ function updatePlayer(deltaTime) {
     cameraTarget.y = character.position.y + 1
     cameraTarget.z = character.position.z
     cameraControls.target = cameraTarget
-    character.lookAt(new THREE.Vector3(0,0,0))
-
 }
 
 function animate() {
@@ -287,6 +367,14 @@ function animate() {
     if (character) {
         controls()
         updatePlayer(deltaTime)
+        let regardeBitch = new THREE.Vector3
+        camera.getWorldDirection(regardeBitch)
+        regardeBitch.add(character.position)
+        regardeBitch.y = 0
+        // On additionne à la direction de la caméra la position du joueurs car la caméra nous donne un vecteur unitaire.
+        character.lookAt(regardeBitch)
+
+
     }
     requestAnimationFrame(animate)
     renderer.render(scene, camera)
