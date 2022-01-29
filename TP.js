@@ -7,12 +7,14 @@ import {FBXLoader} from "/node_modules/three/examples/jsm/loaders/FBXLoader.js";
 import {MTLLoader} from "/node_modules/three/examples/jsm/loaders/MTLLoader.js";
 import {OBJLoader} from "/node_modules/three/examples/jsm/loaders/OBJLoader.js";
 import {Octree} from "/node_modules/three/examples/jsm/math/Octree.js";
-import {Clock, Object3D, Vector3} from "three";
+import {Capsule} from "/node_modules/three/examples/jsm/math/Capsule.js";
 
 let sun, clock, renderer, camera, cameraControls
 let cameraTarget = new THREE.Vector3()
 const keyStates = {};
-const world = new Octree()
+let worldMap
+const worldOctree = new Octree();
+const playerCollider = new Capsule( new THREE.Vector3( 0, 0.35, 0 ), new THREE.Vector3( 0, 1, 0 ), 1 );
 const playerDirection = new THREE.Vector3();
 const playerVelocity = new THREE.Vector3(0, 0, 0);
 let animationActions = []
@@ -124,7 +126,8 @@ function init() {
 
             // scenesMeshes.push(m)
             scene.add(object)
-            // world.fromGraphNode(object.scene);
+            worldMap = object
+            worldOctree.fromGraphNode(object);
         })
     });
 // Add Sky
@@ -273,7 +276,7 @@ function onDocumentKeyUp(event) {
 function getForwardVector() {
 
     camera.getWorldDirection(playerDirection);
-    playerDirection.y = 0;
+    // playerDirection.y = 0;
     playerDirection.normalize();
 
     return playerDirection;
@@ -293,15 +296,13 @@ function getSideVector() {
 
 function getUpVector() {
 
-    let upVector = new THREE.Vector3(0, 5, 0)
-    return upVector
+    return new THREE.Vector3(0, 5, 0)
 
 }
 
 function getDownVector() {
 
-    let downVector = new THREE.Vector3(0, -5, 0)
-    return downVector
+    return new THREE.Vector3(0, -5, 0)
 
 }
 
@@ -347,24 +348,41 @@ function controls(deltaTime) {
 
 }
 
+function playerCollisions() {
+
+    const result = worldOctree.capsuleIntersect( playerCollider );
+
+
+    if ( result ) {
+
+        playerCollider.translate( result.normal.multiplyScalar( result.depth ) );
+
+    }
+
+}
+
 function updatePlayer(deltaTime) {
+
 
     // const result = world.capsuleIntersect(character);
     playerVelocity.add(playerVelocity);
 
     const deltaPosition = playerVelocity.clone().multiplyScalar(deltaTime * 5);
+    playerCollider.translate( deltaPosition );
 
-    character.position.add(deltaPosition);
+    playerCollisions();
+    // character.position.add(deltaPosition);
+    character.position.copy(playerCollider.end);
     camera.position.add(deltaPosition)
-    cameraTarget.x = character.position.x
-    cameraTarget.y = character.position.y + 1
-    cameraTarget.z = character.position.z
+    cameraTarget.x = playerCollider.end.x
+    cameraTarget.y = playerCollider.end.y + 1
+    cameraTarget.z = playerCollider.end.z
     cameraControls.target = cameraTarget
 }
 
 function animate() {
     deltaTime = clock.getDelta()
-    if (character) {
+    if (character && worldMap) {
         controls()
         updatePlayer(deltaTime)
         let regardeBitch = new THREE.Vector3
@@ -376,8 +394,8 @@ function animate() {
 
 
     }
-    requestAnimationFrame(animate)
     renderer.render(scene, camera)
+    requestAnimationFrame(animate)
 
     // raycaster.setFromCamera(new THREE.Vector2(), camera);
 
