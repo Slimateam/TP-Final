@@ -8,6 +8,7 @@ import {MTLLoader} from "/node_modules/three/examples/jsm/loaders/MTLLoader.js";
 import {OBJLoader} from "/node_modules/three/examples/jsm/loaders/OBJLoader.js";
 import {Octree} from "/node_modules/three/examples/jsm/math/Octree.js";
 import {Capsule} from "/node_modules/three/examples/jsm/math/Capsule.js";
+import {Vector3} from "three";
 
 // Logique de rendering
 let clock, renderer, deltaTime
@@ -16,16 +17,54 @@ clock = new THREE.Clock()
 const manager = new THREE.LoadingManager();
 
 // Personnage, animation et déplacements
-let character
-let mixer, tPose, forwardWalk, backwardWalk, leftWalk, rightWalk, activeAnimation
+let character, characterLoaded
+let mixer, activeAnimation
 const keyStates = {};
 let animationActions = []
 const playerDirection = new THREE.Vector3();
 const playerVelocity = new THREE.Vector3(0, 0, 0);
 
 // Caméra
-let camera, cameraControls
-let cameraTarget = new THREE.Vector3()
+let camera, distanteCam
+
+class ThirdPersonCamera {
+    constructor(params) {
+        this._params = params;
+        this._camera = params.camera;
+        
+        this._currentPosition = new THREE.Vector3();
+        this._currentLookat = new THREE.Vector3();
+    }
+    
+    _CalculateIdealOffset() {
+        const idealOffset = new THREE.Vector3(-15, 20, -30);
+        idealOffset.applyQuaternion(this._params.target.rotation);
+        idealOffset.add(this._params.target.Position);
+        return idealOffset;
+    }
+    
+    _CalculateIdealLookat() {
+        const idealLookat = new THREE.Vector3(0, 10, 50);
+        idealLookat.applyQuaternion(this._params.target.rotation);
+        idealLookat.add(this._params.target.Position);
+        return idealLookat;
+    }
+    
+    Update(timeElapsed) {
+        const idealOffset = this._CalculateIdealOffset();
+        const idealLookat = this._CalculateIdealLookat();
+        
+        // const t = 0.05;
+        // const t = 4.0 * timeElapsed;
+        const t = 1.0 - Math.pow(0.001, timeElapsed);
+        
+        this._currentPosition.lerp(idealOffset, t);
+        this._currentLookat.lerp(idealLookat, t);
+        
+        this._camera.position.copy(this._currentPosition);
+        this._camera.lookAt(this._currentLookat);
+    }
+}
 
 // Framework collision
 const worldOctree = new Octree();
@@ -39,6 +78,7 @@ manager.onStart = function (url, itemsLoaded, itemsTotal) {
 };
 manager.onLoad = function () {
     console.log('Loading complete!');
+    characterLoaded = true
 };
 manager.onProgress = function (url, itemsLoaded, itemsTotal) {
     console.log('Loading file: ' + url + '.\nLoaded ' + itemsLoaded + ' of ' + itemsTotal + ' files.');
@@ -63,14 +103,8 @@ function init() {
     
     // Configuration cameras
     camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 5000);
-    camera.position.set(10, 10, 5);
+    camera.position.set(300, 10, 5);
     
-    
-    cameraControls = new OrbitControls(camera, renderer.domElement);
-    cameraControls.target.set(0, 0, 0);
-    cameraControls.maxDistance = 400;
-    cameraControls.minDistance = 10;
-    cameraControls.update();
     window.addEventListener('resize', onWindowResize);
     
     /* Le ciel et le gui*/
@@ -173,11 +207,16 @@ function init() {
             }
         })
         character = object
+        // distanteCam = Caméra qui suit le personnage
+        
+        distanteCam = new THREE.Object3D;
+        character.add(distanteCam)
         scene.add(object);
+        character.position.rotateY(90)
         
     });
     
-    /*const mtlLoader = new MTLLoader(manager)
+    const mtlLoader = new MTLLoader(manager)
      mtlLoader.load("./Animation/final.mtl", function (materials) {
      materials.preload();
      const axesHelper = new THREE.AxesHelper(20);
@@ -203,8 +242,7 @@ function init() {
      worldMap = object
      worldOctree.fromGraphNode(object);
      })
-     });*/
-    
+     });
     /*Lumières et ombres*/
     
     // Lumière ambiante, donne ton et couleur générale
@@ -267,6 +305,20 @@ function onDocumentKeyDown(event) {
         animationActions[3].play()
         activeAnimation = 3
     }
+    if (keyCode === 65) {
+        character.rotateY(0.02)
+        console.log("bah coucou")
+    }
+    if (keyCode === 69) {
+        character.rotateY(-0.02)
+    }
+    if (keyCode === 32) {
+        console.log(camera.position)
+        console.log(character.position)
+        console.log(character.quaternion)
+        console.log(camera.quaternion)
+        console.log("La distance entre camera et character est : " + camera.position.distanceTo(character.position))
+    }
     
 }
 
@@ -327,6 +379,7 @@ function getDownVector() {
 function controls(deltaTime) {
     const speedDelta = 1
     playerVelocity.set(0, 0, 0)
+    
     // gives a bit of air control
     
     if (keyStates['KeyW']) {
@@ -394,36 +447,36 @@ function updatePlayer(deltaTime) {
     playerCollisions();
     // character.position.add(deltaPosition);
     character.position.copy(playerCollider.end);
-    camera.position.add(deltaPosition)
-    cameraTarget.x = playerCollider.end.x
-    cameraTarget.y = playerCollider.end.y + 1
-    cameraTarget.z = playerCollider.end.z
-    cameraControls.target = cameraTarget
+    
+}
+
+function TPSCamera() {
+    /*camera.position.copy(character.position)
+    camera.position.add(new THREE.Vector3(-13, 5, 30))
+    camera.position.applyQuaternion(character.quaternion)*/
+    const idealOffset = new THREE.Vector3(0, 7, -10);
+    idealOffset.applyQuaternion(character.quaternion);
+    idealOffset.add(character.position);
+    camera.position.copy(idealOffset);
+    
+    const idealLookat = new THREE.Vector3(0, 2, 0);
+    idealLookat.applyQuaternion(character.quaternion);
+    idealLookat.add(character.position);
+    camera.lookAt(idealLookat)
 }
 
 function animate() {
     deltaTime = clock.getDelta()
-    if (character && worldMap) {
+    if (character && characterLoaded /*&& worldMap*/) {
         controls()
         updatePlayer(deltaTime)
-        let regardeBitch = new THREE.Vector3
-        camera.getWorldDirection(regardeBitch)
-        regardeBitch.add(character.position)
-        regardeBitch.y = 2
-        // On additionne à la direction de la caméra la position du joueurs car la caméra nous donne un vecteur unitaire.
-        character.lookAt(regardeBitch)
-        
-        
+        TPSCamera()
     }
     renderer.render(scene, camera)
     requestAnimationFrame(animate)
     
-    // raycaster.setFromCamera(new THREE.Vector2(), camera);
-    
-    //calculate objects intersecting the picking ray
     
     mixer.update(deltaTime)
-    // console.log(intersects[0]);
 }
 
 init()
