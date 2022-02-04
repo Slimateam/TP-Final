@@ -1,6 +1,4 @@
 import * as THREE from 'three';
-
-import {OrbitControls} from "/node_modules/three/examples/jsm/controls/OrbitControls.js"
 import {Sky} from "/node_modules/three/examples/jsm/objects/Sky.js";
 import {GUI} from "/node_modules/three/examples/jsm/libs/lil-gui.module.min.js   ";
 import {FBXLoader} from "/node_modules/three/examples/jsm/loaders/FBXLoader.js";
@@ -8,7 +6,6 @@ import {MTLLoader} from "/node_modules/three/examples/jsm/loaders/MTLLoader.js";
 import {OBJLoader} from "/node_modules/three/examples/jsm/loaders/OBJLoader.js";
 import {Octree} from "/node_modules/three/examples/jsm/math/Octree.js";
 import {Capsule} from "/node_modules/three/examples/jsm/math/Capsule.js";
-import {Vector3} from "three";
 
 // Logique de rendering
 let clock, renderer, deltaTime
@@ -23,10 +20,14 @@ const keyStates = {};
 let animationActions = []
 const playerDirection = new THREE.Vector3();
 const playerVelocity = new THREE.Vector3(0, 0, 0);
+const GRAVITY = 300
+let gravityOn = true
+let rotationY = 0.15
 
 // Caméra
 let camera, distanteCam
 
+/*
 class ThirdPersonCamera {
     constructor(params) {
         this._params = params;
@@ -65,11 +66,11 @@ class ThirdPersonCamera {
         this._camera.lookAt(this._currentLookat);
     }
 }
+*/
 
 // Framework collision
 const worldOctree = new Octree();
 const playerCollider = new Capsule(new THREE.Vector3(0, 0.001, 0), new THREE.Vector3(0, 1, 0), 1);
-let switche = 0
 let worldMap, sun, sky
 
 // Gestion de la progression du chargement des imports
@@ -79,6 +80,8 @@ manager.onStart = function (url, itemsLoaded, itemsTotal) {
 manager.onLoad = function () {
     console.log('Loading complete!');
     characterLoaded = true
+   /* controling = new OrbitControls( camera, renderer.domElement );
+    controling.autoRotate = false*/
 };
 manager.onProgress = function (url, itemsLoaded, itemsTotal) {
     console.log('Loading file: ' + url + '.\nLoaded ' + itemsLoaded + ' of ' + itemsTotal + ' files.');
@@ -267,6 +270,24 @@ function init() {
     let lightHelper = new THREE.SpotLightHelper(spotLight);
     scene.add(lightHelper);
     scene.add(ambiant)
+    
+    //controling.addEventListener( 'change', render ); // call this only in static scenes (i.e., if there is no animation loop)
+    
+   /* controling = new OrbitControls( camera, renderer.domElement );
+    controling.enableDamping = false; // an animation loop is required when either damping or auto-rotation are enabled
+    controling.dampingFactor = 0.05;
+    
+    controling.screenSpacePanning = false;
+    controling.autoRotate = false;
+    controling.enabled = true;
+    controling.enablePan = false;
+    controling.keyPanSpeed = 0;
+    controling.panSpeed = 0;
+    controling.dispose()
+    
+    controling.minDistance = 5;
+    controling.maxDistance = 10;*/
+    
 }
 
 
@@ -306,18 +327,18 @@ function onDocumentKeyDown(event) {
         activeAnimation = 3
     }
     if (keyCode === 65) {
-        character.rotateY(0.02)
+        character.rotateY(rotationY)
         console.log("bah coucou")
     }
     if (keyCode === 69) {
-        character.rotateY(-0.02)
+        character.rotateY(-rotationY)
     }
     if (keyCode === 32) {
-        console.log(camera.position)
         console.log(character.position)
-        console.log(character.quaternion)
-        console.log(camera.quaternion)
-        console.log("La distance entre camera et character est : " + camera.position.distanceTo(character.position))
+        console.log("La gravité est " + gravityOn?"actrivée":"désactivée")
+    }
+    if (keyCode === 71) {
+        gravityOn = !gravityOn
     }
     
 }
@@ -346,7 +367,7 @@ function onDocumentKeyUp(event) {
 function getForwardVector() {
     
     camera.getWorldDirection(playerDirection);
-    // playerDirection.y = 0;
+    playerDirection.y = 0;
     playerDirection.normalize();
     
     return playerDirection;
@@ -376,7 +397,7 @@ function getDownVector() {
     
 }
 
-function controls(deltaTime) {
+function controls() {
     const speedDelta = 1
     playerVelocity.set(0, 0, 0)
     
@@ -439,9 +460,19 @@ function updatePlayer(deltaTime) {
     
     // const result = world.capsuleIntersect(character);
     playerVelocity.add(playerVelocity);
-    playerVelocity.y = 0
     
+    // playerVelocity.y = 0
+    
+    // Gravitgé
+    if (gravityOn === true) {
+        playerVelocity.y -= GRAVITY*deltaTime
+    }
+    
+    // Respwan si on tombe en el vido
     const deltaPosition = playerVelocity.clone().multiplyScalar(deltaTime * 5);
+    if (character.position.y < -30){
+        deltaPosition.y = Math.abs(character.position.y) + 10
+    }
     playerCollider.translate(deltaPosition);
     
     playerCollisions();
@@ -454,16 +485,19 @@ function TPSCamera() {
     /*camera.position.copy(character.position)
     camera.position.add(new THREE.Vector3(-13, 5, 30))
     camera.position.applyQuaternion(character.quaternion)*/
-    const idealOffset = new THREE.Vector3(0, 7, -10);
+    const idealOffset = new THREE.Vector3(-2, 4, -5);
     idealOffset.applyQuaternion(character.quaternion);
     idealOffset.add(character.position);
     camera.position.copy(idealOffset);
     
-    const idealLookat = new THREE.Vector3(0, 2, 0);
+    const idealLookat = new THREE.Vector3(-2, 3, 0);
     idealLookat.applyQuaternion(character.quaternion);
     idealLookat.add(character.position);
     camera.lookAt(idealLookat)
+    // controling.target.copy(idealLookat)
+    // controling.target.copy(character.position)
 }
+
 
 function animate() {
     deltaTime = clock.getDelta()
@@ -471,6 +505,9 @@ function animate() {
         controls()
         updatePlayer(deltaTime)
         TPSCamera()
+        // controling.update();
+        character.position.y-=2
+        console.log(character.position.y)
     }
     renderer.render(scene, camera)
     requestAnimationFrame(animate)
