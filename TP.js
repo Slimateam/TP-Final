@@ -6,6 +6,7 @@ import {MTLLoader} from "/node_modules/three/examples/jsm/loaders/MTLLoader.js";
 import {OBJLoader} from "/node_modules/three/examples/jsm/loaders/OBJLoader.js";
 import {Octree} from "/node_modules/three/examples/jsm/math/Octree.js";
 import {Capsule} from "/node_modules/three/examples/jsm/math/Capsule.js";
+import Stats from "/node_modules/three/examples/jsm/libs/stats.module.js";
 
 // Logique de rendering
 let clock, renderer, deltaTime
@@ -26,47 +27,8 @@ let rotationY = 0.15
 
 // Caméra
 let camera, distanteCam
+let FPSview = false
 
-/*
-class ThirdPersonCamera {
-    constructor(params) {
-        this._params = params;
-        this._camera = params.camera;
-        
-        this._currentPosition = new THREE.Vector3();
-        this._currentLookat = new THREE.Vector3();
-    }
-    
-    _CalculateIdealOffset() {
-        const idealOffset = new THREE.Vector3(-15, 20, -30);
-        idealOffset.applyQuaternion(this._params.target.rotation);
-        idealOffset.add(this._params.target.Position);
-        return idealOffset;
-    }
-    
-    _CalculateIdealLookat() {
-        const idealLookat = new THREE.Vector3(0, 10, 50);
-        idealLookat.applyQuaternion(this._params.target.rotation);
-        idealLookat.add(this._params.target.Position);
-        return idealLookat;
-    }
-    
-    Update(timeElapsed) {
-        const idealOffset = this._CalculateIdealOffset();
-        const idealLookat = this._CalculateIdealLookat();
-        
-        // const t = 0.05;
-        // const t = 4.0 * timeElapsed;
-        const t = 1.0 - Math.pow(0.001, timeElapsed);
-        
-        this._currentPosition.lerp(idealOffset, t);
-        this._currentLookat.lerp(idealLookat, t);
-        
-        this._camera.position.copy(this._currentPosition);
-        this._camera.lookAt(this._currentLookat);
-    }
-}
-*/
 
 // Framework collision
 const worldOctree = new Octree();
@@ -80,8 +42,6 @@ manager.onStart = function (url, itemsLoaded, itemsTotal) {
 manager.onLoad = function () {
     console.log('Loading complete!');
     characterLoaded = true
-   /* controling = new OrbitControls( camera, renderer.domElement );
-    controling.autoRotate = false*/
 };
 manager.onProgress = function (url, itemsLoaded, itemsTotal) {
     console.log('Loading file: ' + url + '.\nLoaded ' + itemsLoaded + ' of ' + itemsTotal + ' files.');
@@ -107,8 +67,24 @@ function init() {
     // Configuration cameras
     camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 5000);
     camera.position.set(300, 10, 5);
+    camera.rotation.order = 'YXZ';
     
     window.addEventListener('resize', onWindowResize);
+    
+    (function () {
+        const script = document.createElement('script');
+        script.onload = function () {
+            const stats = new Stats();
+            document.body.appendChild(stats.dom);
+            requestAnimationFrame(function loop() {
+                stats.update();
+                requestAnimationFrame(loop)
+            });
+        };
+        
+        script.src = '//mrdoob.github.io/stats.js/build/stats.min.js';
+        document.head.appendChild(script);
+    })()
     
     /* Le ciel et le gui*/
     // Add Sky
@@ -160,6 +136,10 @@ function init() {
     gui.add(effectController, 'exposure', 0, 1, 0.0001).onChange(guiChanged);
     
     guiChanged();
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const material = new THREE.MeshBasicMaterial({color: 0x00ff00});
+    const cube = new THREE.Mesh(geometry, material);
+    scene.add(cube);
     
     
     /*CHargement des modèles complexes importés et des animations*/
@@ -220,32 +200,34 @@ function init() {
     });
     
     const mtlLoader = new MTLLoader(manager)
-     mtlLoader.load("./Animation/final.mtl", function (materials) {
-     materials.preload();
-     const axesHelper = new THREE.AxesHelper(20);
-     scene.add(axesHelper);
-     
-     const objLoader = new OBJLoader();
-     objLoader.setMaterials(materials);
-     objLoader.load("/Animation/final.obj", function (object) {
-     object.position.x = 0
-     object.position.y = -18
-     object.position.z = 0
-     let scale = 2
-     object.scale.set(scale, scale, scale)
-     object.traverse(function (child) {
-     if (child instanceof THREE.Mesh) {
-     child.castShadow = true;
-     child.receiveShadow = true;
-     }
-     });
-     
-     // scenesMeshes.push(m)
-     scene.add(object)
-     worldMap = object
-     worldOctree.fromGraphNode(object);
-     })
-     });
+    mtlLoader.load("./Animation/final.mtl", function (materials) {
+        materials.preload();
+        const axesHelper = new THREE.AxesHelper(20);
+        scene.add(axesHelper);
+        
+        const objLoader = new OBJLoader();
+        objLoader.setMaterials(materials);
+        objLoader.load("/Animation/final.obj", function (object) {
+            object.position.x = 0
+            object.position.y = -18
+            object.position.z = 0
+            let scale = 2
+            object.scale.set(scale, scale, scale)
+            object.traverse(function (child) {
+                if (child instanceof THREE.Mesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
+            
+            // scenesMeshes.push(m)
+            scene.add(object)
+            worldMap = object
+            worldOctree.fromGraphNode(object);
+        })
+    });
+    
+    
     /*Lumières et ombres*/
     
     // Lumière ambiante, donne ton et couleur générale
@@ -271,43 +253,26 @@ function init() {
     scene.add(lightHelper);
     scene.add(ambiant)
     
-    //controling.addEventListener( 'change', render ); // call this only in static scenes (i.e., if there is no animation loop)
-    
-   /* controling = new OrbitControls( camera, renderer.domElement );
-    controling.enableDamping = false; // an animation loop is required when either damping or auto-rotation are enabled
-    controling.dampingFactor = 0.05;
-    
-    controling.screenSpacePanning = false;
-    controling.autoRotate = false;
-    controling.enabled = true;
-    controling.enablePan = false;
-    controling.keyPanSpeed = 0;
-    controling.panSpeed = 0;
-    controling.dispose()
-    
-    controling.minDistance = 5;
-    controling.maxDistance = 10;*/
-    
 }
 
 
 function onWindowResize() {
-    
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
-    
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-/*Controles du mouvement du personnage, de la caméra*/
+/*** Controles du mouvement du personnage, de la caméra ***/
 
 // Bind des comportements aux touches concernées
 document.addEventListener("keydown", onDocumentKeyDown, false);
+
 document.addEventListener("keyup", onDocumentKeyUp, false);
 
 function onDocumentKeyDown(event) {
     keyStates[event.code] = true;
     let keyCode = event.which;
+    let keyWhich = event.code
     if (keyCode === 0x0D) {
     }
     if (keyCode === 90) {
@@ -335,12 +300,20 @@ function onDocumentKeyDown(event) {
     }
     if (keyCode === 32) {
         console.log(character.position)
-        console.log("La gravité est " + gravityOn?"actrivée":"désactivée")
+        console.log("La gravité est " + gravityOn ? "actrivée" : "désactivée")
     }
     if (keyCode === 71) {
         gravityOn = !gravityOn
     }
-    
+    if (keyWhich === "ShiftRight") {
+        console.log(character.position)
+        character.visible = !character.visible
+    }
+    if (keyCode === 80) {
+        FPSview = !FPSview
+        character.visible = !character.visible
+        console.log("FPS view : turned to " + FPSview)
+    }
 }
 
 function onDocumentKeyUp(event) {
@@ -360,7 +333,6 @@ function onDocumentKeyUp(event) {
     if (keyCode === 83) {
         animationActions[3].stop()
     }
-    
 }
 
 // Addition des vecteurs de mouvements pour la direction
@@ -440,37 +412,31 @@ function controls() {
     
 }
 
-// Système de collision
+
+/*** Système de collision ***/
 
 function playerCollisions() {
     
     const result = worldOctree.capsuleIntersect(playerCollider);
-    
-    
     if (result) {
-        
         playerCollider.translate(result.normal.multiplyScalar(result.depth));
-        
     }
     
 }
 
 function updatePlayer(deltaTime) {
     
-    
     // const result = world.capsuleIntersect(character);
     playerVelocity.add(playerVelocity);
     
-    // playerVelocity.y = 0
-    
-    // Gravitgé
+    // Gravité
     if (gravityOn === true) {
-        playerVelocity.y -= GRAVITY*deltaTime
+        playerVelocity.y -= GRAVITY * deltaTime
     }
     
     // Respwan si on tombe en el vido
     const deltaPosition = playerVelocity.clone().multiplyScalar(deltaTime * 5);
-    if (character.position.y < -30){
+    if (character.position.y < -30) {
         deltaPosition.y = Math.abs(character.position.y) + 10
     }
     playerCollider.translate(deltaPosition);
@@ -478,13 +444,14 @@ function updatePlayer(deltaTime) {
     playerCollisions();
     // character.position.add(deltaPosition);
     character.position.copy(playerCollider.end);
+    if (FPSview) {
+        camera.position.copy(playerCollider.end)
+    }
     
 }
 
 function TPSCamera() {
-    /*camera.position.copy(character.position)
-    camera.position.add(new THREE.Vector3(-13, 5, 30))
-    camera.position.applyQuaternion(character.quaternion)*/
+    
     const idealOffset = new THREE.Vector3(-2, 4, -5);
     idealOffset.applyQuaternion(character.quaternion);
     idealOffset.add(character.position);
@@ -494,19 +461,36 @@ function TPSCamera() {
     idealLookat.applyQuaternion(character.quaternion);
     idealLookat.add(character.position);
     camera.lookAt(idealLookat)
-    // controling.target.copy(idealLookat)
-    // controling.target.copy(character.position)
 }
+
+
+/* Gestion de la vue FPS  */
+document.addEventListener('mousedown', () => {
+    document.body.requestPointerLock();
+    console.log(document.pointerLockElement)
+});
+document.body.addEventListener('mousemove', (event) => {
+    if (document.pointerLockElement === document.body) {
+        camera.rotation.y -= event.movementX / 500;
+        camera.rotation.x -= event.movementY / 500;
+    }
+});
 
 
 function animate() {
     deltaTime = clock.getDelta()
-    if (character && characterLoaded /*&& worldMap*/) {
+    
+    if (character && characterLoaded && worldMap) {
         controls()
         updatePlayer(deltaTime)
-        TPSCamera()
+        if (!FPSview) {
+            TPSCamera()
+        } else {
+            camera.position.y += 3
+        }
+        
         // controling.update();
-        character.position.y-=2
+        character.position.y -= 2
         console.log(character.position.y)
     }
     renderer.render(scene, camera)
@@ -515,6 +499,7 @@ function animate() {
     
     mixer.update(deltaTime)
 }
+
 
 init()
 
