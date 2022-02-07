@@ -7,16 +7,17 @@ import {OBJLoader} from "/node_modules/three/examples/jsm/loaders/OBJLoader.js";
 import {Octree} from "/node_modules/three/examples/jsm/math/Octree.js";
 import {Capsule} from "/node_modules/three/examples/jsm/math/Capsule.js";
 import Stats from "/node_modules/three/examples/jsm/libs/stats.module.js";
-import {Raycaster} from "three";
+import {PointerLockControls} from "/node_modules/three/examples/jsm/controls/PointerLockControls.js";
 
 // Logique de rendering
 let clock, renderer, deltaTime
 let scene = new THREE.Scene()
+scene.background = new THREE.Color( 0xe6a06d )
 clock = new THREE.Clock()
 const manager = new THREE.LoadingManager();
 
 // Lumière
-let lightHelper, shadowCameraHelper
+let lightHelper, shadowCameraHelper, lave, lave2
 
 // Personnage, animation et déplacements
 let character, characterLoaded
@@ -36,7 +37,7 @@ let rotationY = 0.15
 let lavaFlat, zombieDeathSound
 
 // Caméra
-let camera, distanteCam
+let camera
 let FPSview = false
 
 
@@ -81,6 +82,31 @@ function init() {
     
     window.addEventListener('resize', onWindowResize);
     
+    
+    /*
+     Camera locker sur le navigateur
+     */
+    const controles = new PointerLockControls( camera, document.body );
+    const blocker = document.getElementById( 'blocker' );
+    const instructions = document.getElementById( 'instructions' );
+    
+    instructions.addEventListener( 'click', function () {
+        controles.lock();
+    } );
+    
+    controles.addEventListener( 'lock', function () {
+        instructions.style.display = 'none';
+        blocker.style.display = 'none';
+    } );
+    
+    controles.addEventListener( 'unlock', function () {
+        blocker.style.display = 'block';
+        instructions.style.display = '';
+    } );
+    
+    scene.add( controles.getObject() );
+    
+    
     (function () {
         const script = document.createElement('script');
         script.onload = function () {
@@ -97,16 +123,16 @@ function init() {
     })()
     
     /* Le ciel et le gui*/
-    // Add Sky
+    /*// Add Sky
     sky = new Sky();
     sky.scale.setScalar(450000);
     scene.add(sky);
-    sun = new THREE.Vector3();
+    sun = new THREE.Vector3();*/
     
     /*Lumières et ombres*/
     
     // Lumière ambiante, donne ton et couleur générale
-    let ambiant = new THREE.AmbientLight('white', 0.1)
+    let ambient = new THREE.AmbientLight('white', 0.1)
     
     // Lumière dirigée qui donne des ombres
     let spotLight = new THREE.SpotLight(0xe6a06d, 1);
@@ -129,11 +155,21 @@ function init() {
     scene.add(lightHelper);
     shadowCameraHelper = new THREE.CameraHelper(spotLight.shadow.camera);
     scene.add(shadowCameraHelper);
-    scene.add(ambiant)
+    scene.add(ambient)
+    
+    lave = new THREE.PointLight(0x821b0a,0.7,8)
+    lave.position.set(-3,10,-54)
+    lave.castShadow = true;
+    scene.add(lave)
+    
+    lave2 = new THREE.PointLight(0x821b0a,0.7,8)
+    lave2.position.set(-6,9,-13)
+    lave2.castShadow = true;
+    scene.add(lave2)
     
     /// GUI
     
-    const effectController = {
+    /*const effectController = {
         turbidity: 10,
         rayleigh: 3,
         mieCoefficient: 0.005,
@@ -163,8 +199,6 @@ function init() {
         
     }
     
-    const gui = new GUI();
-    const skyFolder = gui.addFolder('Sky')
     
     skyFolder.add(effectController, 'turbidity', 0.0, 20.0, 0.1).onChange(guiChanged);
     skyFolder.add(effectController, 'rayleigh', 0.0, 4, 0.001).onChange(guiChanged);
@@ -173,7 +207,11 @@ function init() {
     skyFolder.add(effectController, 'elevation', 0, 90, 0.1).onChange(guiChanged);
     skyFolder.add(effectController, 'azimuth', -180, 180, 0.1).onChange(guiChanged);
     skyFolder.add(effectController, 'exposure', 0, 1, 0.0001).onChange(guiChanged);
+    */
     
+    
+    const gui = new GUI();
+    const skyFolder = gui.addFolder('Sky')
     const spotlightFolder = gui.addFolder('spotlight')
     
     const params = {
@@ -229,8 +267,51 @@ function init() {
         
     });
     
+    let time = 18
+    const parametre = {
+        time: time
+    }
+    gui.add(parametre,'time',0, 24).onChange(function (val) {
+        spotLight.position.x = -100 + (8.333333*val)
+        spotLight.position.y = 60
+        spotLight.position.z = 40 + (-3.33333*val)
+        if(val <= 6){
+            scene.remove(ambient)
+            spotLight.color.setHex(0xffffff)
+            scene.background = new THREE.Color( 0x0e1625 )
+            ambient = new THREE.AmbientLight( 0x0e1625, 0.1 )
+            scene.add( ambient );
+        }
+        if(val >= 6 && val <= 10){
+            scene.remove(ambient)
+            spotLight.color.setHex(0xb55b43)
+            scene.background = new THREE.Color( 0xe6c56d )
+            ambient = new THREE.AmbientLight( 0xe6c56d, 0.1 )
+            scene.add( ambient );
+        }
+        if(val >= 11 && val <= 14){
+            scene.remove(ambient)
+            spotLight.color.setHex(0xf5ed97)
+            scene.background = new THREE.Color( 0x80c1fe )
+            ambient = new THREE.AmbientLight( 0x80c1fe, 0.1 )
+            scene.add( ambient );
+        }
+        if(val >= 15 && val <= 18){
+            scene.remove(ambient)
+            spotLight.color.setHex(0xe6a06d)
+            scene.background = new THREE.Color( 0xe6a06d )
+            ambient = new THREE.AmbientLight( 0xe6a06d, 0.1 )
+            scene.add( ambient );
+        }
+        if(val >= 19 && val <= 24){
+            scene.remove(ambient)
+            spotLight.color.setHex(0xcccccc)
+            scene.background = new THREE.Color( 0x0e1625 )
+            ambient = new THREE.AmbientLight( 0x0e1625, 0.1 )
+            scene.add( ambient );
+        }
+    })
     
-    guiChanged();
     // create an AudioListener and add it to the camera
     const listener = new THREE.AudioListener();
     camera.add(listener);
@@ -244,8 +325,8 @@ function init() {
     audioLoader.load('audio/minecraft-lava-ambience-sound.mp3', function (buffer) {
         sound.setBuffer(buffer);
         sound.setRefDistance(20);
-        sound2.setRolloffFactor(1);
-        sound2.setDistanceModel("linear");
+        sound.setRolloffFactor(1);
+        sound.setDistanceModel("linear");
         sound.setVolume(0.3);
         sound.play();
         const geometry = new THREE.BoxGeometry(1, 1, 1);
@@ -264,7 +345,7 @@ function init() {
         const geometry = new THREE.BoxGeometry(1, 1, 1);
         const material = new THREE.MeshBasicMaterial({color: 0x00ff00});
         const cube2 = new THREE.Mesh(geometry, material);
-        cube2.position.set(-3, 0, -54)
+        cube2.position.set(3, 0, -35)
         cube2.add(sound2)
         scene.add(cube2);
     });
@@ -694,8 +775,9 @@ document.addEventListener('mousedown', (event) => {
     if (objects.length > 0) {
         console.log(objects)
         
-        zombieAnimations[0].stop()
+        // zombieAnimations[0].stop()
         zombieAnimations[1].play()
+        zombieAnimations[0].crossFadeTo(zombieAnimations[1])
         zombieDeathSound.play()
     }else {
         zombieAnimations[1].stop()
