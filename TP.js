@@ -25,6 +25,9 @@ let zombie
 let zombieAnimations = []
 let mixer, activeAnimation
 let mixerZombie
+let chest
+let mixerChest
+let ouverture, fermeture
 const keyStates = {};
 let animationActions = []
 const playerDirection = new THREE.Vector3();
@@ -158,12 +161,12 @@ function init() {
     scene.add(ambient)
     
     lave = new THREE.PointLight(0x821b0a,0.7,8)
-    lave.position.set(-3,10,-54)
+    lave.position.set(-13,2,-26)
     lave.castShadow = true;
     scene.add(lave)
     
     lave2 = new THREE.PointLight(0x821b0a,0.7,8)
-    lave2.position.set(-6,9,-13)
+    lave2.position.set(-4,2,-50)
     lave2.castShadow = true;
     scene.add(lave2)
     
@@ -408,18 +411,38 @@ function init() {
         })
         character = object
         character.animations[0] = animationActions[4]
-        zombieDeathSound = new THREE.PositionalAudio(listener);
-    
-        // load a sound and set it as the PositionalAudio object's buffer
-        const audioLoader = new THREE.AudioLoader();
-        audioLoader.load('audio/codZombieYa.mp3', function (buffer) {
-            zombieDeathSound.setBuffer(buffer);
-            zombieDeathSound.setRefDistance(20);
-            zombieDeathSound.setVolume(0.3);
-            character.add(zombieDeathSound)
-        });
-        character.rotateY(-3)
+        // character.rotateY(-3)
         scene.add(object);
+    });
+    
+    const loader3 = new FBXLoader(manager);
+    loader3.load('/animation/Chest.fbx', function (object) {
+        const anim = new FBXLoader(manager);
+    
+        anim.load('/animation/Chest_Close.fbx', (anim) => {
+        
+            // AnimationMixer permet de jouer de jouer des animations pour un objet ciblé, ici "pers"
+        
+            mixerChest = new THREE.AnimationMixer(object);
+        
+            // ClipAction est un ensemble d'attributs et de sous fonctions utile à l'animation 3D de l'objet, puis qu'on range dans un tableau.
+        
+            ouverture = mixerChest.clipAction(anim.animations[0]);
+            
+        })
+        
+        let scale = 0.02
+        object.scale.set(scale, scale, scale);
+        object.traverse(function (child) {
+            if (child instanceof THREE.Mesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        })
+        // character.rotateY(-3)
+        scene.add(object);
+        chest = object
+        chest.position.set(-5, 2, -45)
     });
     
     
@@ -462,6 +485,17 @@ function init() {
         scene.add(object);
         // zombie.rotateY(90)
         zombie.position.set(-5, 0, -35)
+    
+        zombieDeathSound = new THREE.PositionalAudio(listener);
+    
+        // load a sound and set it as the PositionalAudio object's buffer
+        const audioLoader = new THREE.AudioLoader();
+        audioLoader.load('audio/codZombieYa.mp3', function (buffer) {
+            zombieDeathSound.setBuffer(buffer);
+            zombieDeathSound.setRefDistance(20);
+            zombieDeathSound.setVolume(0.3);
+            zombie.add(zombieDeathSound)
+        });
         
     });
     
@@ -562,6 +596,10 @@ function onDocumentKeyDown(event) {
         FPSview = !FPSview
         character.visible = !character.visible
         console.log("FPS view : turned to " + FPSview)
+    }
+    if (keyCode === 107) {
+       ouverture.play()
+        console.log(ouverture)
     }
 }
 
