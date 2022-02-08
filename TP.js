@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import {Sky} from "/node_modules/three/examples/jsm/objects/Sky.js";
 import {GUI} from "/node_modules/three/examples/jsm/libs/lil-gui.module.min.js   ";
 import {FBXLoader} from "/node_modules/three/examples/jsm/loaders/FBXLoader.js";
 import {MTLLoader} from "/node_modules/three/examples/jsm/loaders/MTLLoader.js";
@@ -12,7 +11,7 @@ import {PointerLockControls} from "/node_modules/three/examples/jsm/controls/Poi
 // Logique de rendering
 let clock, renderer, deltaTime
 let scene = new THREE.Scene()
-scene.background = new THREE.Color( 0xe6a06d )
+scene.background = new THREE.Color(0xe6a06d)
 clock = new THREE.Clock()
 const manager = new THREE.LoadingManager();
 
@@ -47,7 +46,7 @@ let FPSview = false
 // Framework collision
 const worldOctree = new Octree();
 const playerCollider = new Capsule(new THREE.Vector3(0, 0.001, 0), new THREE.Vector3(0, 1, 0), 1);
-let worldMap, sun, sky
+let worldMap
 
 // Gestion de la progression du chargement des imports
 manager.onStart = function (url, itemsLoaded, itemsTotal) {
@@ -56,9 +55,17 @@ manager.onStart = function (url, itemsLoaded, itemsTotal) {
 manager.onLoad = function () {
     console.log('Loading complete!');
     characterLoaded = true
+    const myProgress = document.getElementById("myProgress");
+    myProgress.remove()
+    progressText.remove()
 };
+const elem = document.getElementById("myBar");
+const progressText = document.getElementById("progressText");
 manager.onProgress = function (url, itemsLoaded, itemsTotal) {
     console.log('Loading file: ' + url + '.\nLoaded ' + itemsLoaded + ' of ' + itemsTotal + ' files.');
+    elem.style.width = (itemsLoaded / itemsTotal * 100) + '%';
+    progressText.innerHTML = 'Loading file: ' + url + '.\nLoaded ' + itemsLoaded + ' of ' + itemsTotal + ' files.'
+    
 };
 manager.onError = function (url) {
     console.log('There was an error loading ' + url);
@@ -89,25 +96,25 @@ function init() {
     /*
      Camera locker sur le navigateur
      */
-    const controles = new PointerLockControls( camera, document.body );
-    const blocker = document.getElementById( 'blocker' );
-    const instructions = document.getElementById( 'instructions' );
+    const controles = new PointerLockControls(camera, document.body);
+    const blocker = document.getElementById('blocker');
+    const instructions = document.getElementById('instructions');
     
-    instructions.addEventListener( 'click', function () {
+    instructions.addEventListener('click', function () {
         controles.lock();
-    } );
+    });
     
-    controles.addEventListener( 'lock', function () {
+    controles.addEventListener('lock', function () {
         instructions.style.display = 'none';
         blocker.style.display = 'none';
-    } );
+    });
     
-    controles.addEventListener( 'unlock', function () {
+    controles.addEventListener('unlock', function () {
         blocker.style.display = 'block';
         instructions.style.display = '';
-    } );
+    });
     
-    scene.add( controles.getObject() );
+    scene.add(controles.getObject());
     
     
     (function () {
@@ -124,13 +131,6 @@ function init() {
         script.src = '//mrdoob.github.io/stats.js/build/stats.min.js';
         document.head.appendChild(script);
     })()
-    
-    /* Le ciel et le gui*/
-    /*// Add Sky
-    sky = new Sky();
-    sky.scale.setScalar(450000);
-    scene.add(sky);
-    sun = new THREE.Vector3();*/
     
     /*Lumières et ombres*/
     
@@ -160,61 +160,19 @@ function init() {
     scene.add(shadowCameraHelper);
     scene.add(ambient)
     
-    lave = new THREE.PointLight(0x821b0a,0.7,8)
-    lave.position.set(-13,2,-26)
+    lave = new THREE.PointLight(0x821b0a, 0.7, 8)
+    lave.position.set(-13, 2, -26)
     lave.castShadow = true;
     scene.add(lave)
     
-    lave2 = new THREE.PointLight(0x821b0a,0.7,8)
-    lave2.position.set(-4,2,-50)
+    lave2 = new THREE.PointLight(0x821b0a, 0.7, 8)
+    lave2.position.set(-4, 2, -50)
     lave2.castShadow = true;
     scene.add(lave2)
     
     /// GUI
     
-    /*const effectController = {
-        turbidity: 10,
-        rayleigh: 3,
-        mieCoefficient: 0.005,
-        mieDirectionalG: 0.7,
-        elevation: 2,
-        azimuth: 180,
-        exposure: renderer.toneMappingExposure
-    };
-    
-    function guiChanged() {
-        
-        const uniforms = sky.material.uniforms;
-        uniforms['turbidity'].value = effectController.turbidity;
-        uniforms['rayleigh'].value = effectController.rayleigh;
-        uniforms['mieCoefficient'].value = effectController.mieCoefficient;
-        uniforms['mieDirectionalG'].value = effectController.mieDirectionalG;
-        
-        const phi = THREE.MathUtils.degToRad(90 - effectController.elevation);
-        const theta = THREE.MathUtils.degToRad(effectController.azimuth);
-        
-        sun.setFromSphericalCoords(1, phi, theta);
-        
-        uniforms['sunPosition'].value.copy(sun);
-        
-        renderer.toneMappingExposure = effectController.exposure;
-        renderer.render(scene, camera);
-        
-    }
-    
-    
-    skyFolder.add(effectController, 'turbidity', 0.0, 20.0, 0.1).onChange(guiChanged);
-    skyFolder.add(effectController, 'rayleigh', 0.0, 4, 0.001).onChange(guiChanged);
-    skyFolder.add(effectController, 'mieCoefficient', 0.0, 0.1, 0.001).onChange(guiChanged);
-    skyFolder.add(effectController, 'mieDirectionalG', 0.0, 1, 0.001).onChange(guiChanged);
-    skyFolder.add(effectController, 'elevation', 0, 90, 0.1).onChange(guiChanged);
-    skyFolder.add(effectController, 'azimuth', -180, 180, 0.1).onChange(guiChanged);
-    skyFolder.add(effectController, 'exposure', 0, 1, 0.0001).onChange(guiChanged);
-    */
-    
-    
     const gui = new GUI();
-    const skyFolder = gui.addFolder('Sky')
     const spotlightFolder = gui.addFolder('spotlight')
     
     const params = {
@@ -274,44 +232,44 @@ function init() {
     const parametre = {
         time: time
     }
-    gui.add(parametre,'time',0, 24).onChange(function (val) {
-        spotLight.position.x = -100 + (8.333333*val)
+    gui.add(parametre, 'time', 0, 24).onChange(function (val) {
+        spotLight.position.x = -100 + (8.333333 * val)
         spotLight.position.y = 60
-        spotLight.position.z = 40 + (-3.33333*val)
-        if(val <= 6){
+        spotLight.position.z = 40 + (-3.33333 * val)
+        if (val <= 6) {
             scene.remove(ambient)
             spotLight.color.setHex(0xffffff)
-            scene.background = new THREE.Color( 0x0e1625 )
-            ambient = new THREE.AmbientLight( 0x0e1625, 0.1 )
-            scene.add( ambient );
+            scene.background = new THREE.Color(0x0e1625)
+            ambient = new THREE.AmbientLight(0x0e1625, 0.1)
+            scene.add(ambient);
         }
-        if(val >= 6 && val <= 10){
+        if (val >= 6 && val <= 10) {
             scene.remove(ambient)
             spotLight.color.setHex(0xb55b43)
-            scene.background = new THREE.Color( 0xe6c56d )
-            ambient = new THREE.AmbientLight( 0xe6c56d, 0.1 )
-            scene.add( ambient );
+            scene.background = new THREE.Color(0xe6c56d)
+            ambient = new THREE.AmbientLight(0xe6c56d, 0.1)
+            scene.add(ambient);
         }
-        if(val >= 11 && val <= 14){
+        if (val >= 11 && val <= 14) {
             scene.remove(ambient)
             spotLight.color.setHex(0xf5ed97)
-            scene.background = new THREE.Color( 0x80c1fe )
-            ambient = new THREE.AmbientLight( 0x80c1fe, 0.1 )
-            scene.add( ambient );
+            scene.background = new THREE.Color(0x80c1fe)
+            ambient = new THREE.AmbientLight(0x80c1fe, 0.1)
+            scene.add(ambient);
         }
-        if(val >= 15 && val <= 18){
+        if (val >= 15 && val <= 18) {
             scene.remove(ambient)
             spotLight.color.setHex(0xe6a06d)
-            scene.background = new THREE.Color( 0xe6a06d )
-            ambient = new THREE.AmbientLight( 0xe6a06d, 0.1 )
-            scene.add( ambient );
+            scene.background = new THREE.Color(0xe6a06d)
+            ambient = new THREE.AmbientLight(0xe6a06d, 0.1)
+            scene.add(ambient);
         }
-        if(val >= 19 && val <= 24){
+        if (val >= 19 && val <= 24) {
             scene.remove(ambient)
             spotLight.color.setHex(0xcccccc)
-            scene.background = new THREE.Color( 0x0e1625 )
-            ambient = new THREE.AmbientLight( 0x0e1625, 0.1 )
-            scene.add( ambient );
+            scene.background = new THREE.Color(0x0e1625)
+            ambient = new THREE.AmbientLight(0x0e1625, 0.1)
+            scene.add(ambient);
         }
     })
     
@@ -418,15 +376,15 @@ function init() {
     const loader3 = new FBXLoader(manager);
     loader3.load('/animation/Chest.fbx', function (object) {
         const anim = new FBXLoader(manager);
-    
+        
         anim.load('/animation/Chest_Close.fbx', (anim) => {
-        
+            
             // AnimationMixer permet de jouer de jouer des animations pour un objet ciblé, ici "pers"
-        
+            
             mixerChest = new THREE.AnimationMixer(object);
-        
+            
             // ClipAction est un ensemble d'attributs et de sous fonctions utile à l'animation 3D de l'objet, puis qu'on range dans un tableau.
-        
+            
             ouverture = mixerChest.clipAction(anim.animations[0]);
             
         })
@@ -485,9 +443,9 @@ function init() {
         scene.add(object);
         // zombie.rotateY(90)
         zombie.position.set(-5, 0, -35)
-    
+        
         zombieDeathSound = new THREE.PositionalAudio(listener);
-    
+        
         // load a sound and set it as the PositionalAudio object's buffer
         const audioLoader = new THREE.AudioLoader();
         audioLoader.load('audio/codZombieYa.mp3', function (buffer) {
@@ -500,33 +458,33 @@ function init() {
     });
     
     const mtlLoader = new MTLLoader(manager)
-     mtlLoader.load("./Animation/final.mtl", function (materials) {
-     materials.preload();
-     const axesHelper = new THREE.AxesHelper(20);
-     scene.add(axesHelper);
-     
-     const objLoader = new OBJLoader();
-     objLoader.setMaterials(materials);
-     objLoader.load("/Animation/final.obj", function (object) {
-     object.position.x = 0
-     object.position.y = -18
-     object.position.z = 0
-     let scale = 2
-     object.scale.set(scale, scale, scale)
-     object.traverse(function (child) {
-     if (child instanceof THREE.Mesh) {
-     child.castShadow = true;
-     child.receiveShadow = true;
-     }
-     });
-     
-     // scenesMeshes.push(m)
-     scene.add(object)
-     worldMap = object
-     worldOctree.fromGraphNode(object);
-     })
-     });
-
+    mtlLoader.load("./Animation/final.mtl", function (materials) {
+        materials.preload();
+        const axesHelper = new THREE.AxesHelper(20);
+        scene.add(axesHelper);
+        
+        const objLoader = new OBJLoader();
+        objLoader.setMaterials(materials);
+        objLoader.load("/Animation/final.obj", function (object) {
+            object.position.x = 0
+            object.position.y = -18
+            object.position.z = 0
+            let scale = 2
+            object.scale.set(scale, scale, scale)
+            object.traverse(function (child) {
+                if (child instanceof THREE.Mesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
+            
+            // scenesMeshes.push(m)
+            scene.add(object)
+            worldMap = object
+            worldOctree.fromGraphNode(object);
+        })
+    });
+    
 }
 
 
@@ -598,7 +556,7 @@ function onDocumentKeyDown(event) {
         console.log("FPS view : turned to " + FPSview)
     }
     if (keyCode === 107) {
-       ouverture.play()
+        ouverture.play()
         console.log(ouverture)
     }
 }
@@ -817,10 +775,10 @@ document.addEventListener('mousedown', (event) => {
         zombieAnimations[1].play()
         zombieAnimations[0].crossFadeTo(zombieAnimations[1])
         zombieDeathSound.play()
-    }else {
+    } else {
         zombieAnimations[1].stop()
         zombieAnimations[0].play()
-    
+        
     }
     
 })
@@ -829,7 +787,7 @@ document.addEventListener('mousedown', (event) => {
 function animate() {
     deltaTime = clock.getDelta()
     
-    if (character && characterLoaded /*&& worldMap*/) {
+    if (characterLoaded) {
         controls()
         updatePlayer(deltaTime)
         if (!FPSview) {
@@ -850,6 +808,7 @@ function animate() {
     
     mixer.update(deltaTime)
     mixerZombie.update(deltaTime)
+    mixerChest.update(deltaTime)
 }
 
 

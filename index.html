@@ -27,6 +27,16 @@
             font-size: 14px;
             cursor: pointer;
         }
+        #myProgress {
+            width: 70%;
+            background-color: #ddd;
+        }
+
+        #myBar {
+            width: 1%;
+            height: 30px;
+            background-color: #04AA6D;
+        }
     </style>
 </head>
 <body id="body">
@@ -40,6 +50,11 @@
             Sauter: SPACE<br/>
             Look: Souris
         </p>
+        <div id="myProgress">
+            <div id="myBar"></div>
+        </div>
+        <p id="progressText" style="color: white"></p>
+
     </div>
 </div>
 <script type="importmap">
