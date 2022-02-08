@@ -14,16 +14,26 @@ let scene = new THREE.Scene()
 clock = new THREE.Clock()
 const manager = new THREE.LoadingManager();
 
+// Lumière
+let lightHelper, shadowCameraHelper
+
 // Personnage, animation et déplacements
 let character, characterLoaded
+let backwards, idle
+let zombie
+let zombieAnimations = []
 let mixer, activeAnimation
+let mixerZombie
 const keyStates = {};
 let animationActions = []
 const playerDirection = new THREE.Vector3();
 const playerVelocity = new THREE.Vector3(0, 0, 0);
 const GRAVITY = 300
-let gravityOn = true
+let gravityOn = false
 let rotationY = 0.15
+
+// Audio
+let lavaFlat, zombieDeathSound
 
 // Caméra
 let camera, distanteCam
@@ -93,6 +103,34 @@ function init() {
     scene.add(sky);
     sun = new THREE.Vector3();
     
+    /*Lumières et ombres*/
+    
+    // Lumière ambiante, donne ton et couleur générale
+    let ambiant = new THREE.AmbientLight('white', 0.1)
+    
+    // Lumière dirigée qui donne des ombres
+    let spotLight = new THREE.SpotLight(0xe6a06d, 1);
+    spotLight.position.set(50, 60, -20);
+    spotLight.angle = Math.PI / 3;
+    spotLight.penumbra = 0.1;
+    spotLight.decay = 2;
+    spotLight.distance = 200;
+    spotLight.intensity = 1;
+    
+    
+    spotLight.castShadow = true;
+    spotLight.shadow.mapSize.width = 512; // Résolution des ombres
+    spotLight.shadow.mapSize.height = 512; // Résolution des ombres
+    spotLight.shadow.camera.near = 1;
+    spotLight.shadow.camera.far = 200;
+    spotLight.shadow.focus = 1;
+    scene.add(spotLight);
+    lightHelper = new THREE.SpotLightHelper(spotLight);
+    scene.add(lightHelper);
+    shadowCameraHelper = new THREE.CameraHelper(spotLight.shadow.camera);
+    scene.add(shadowCameraHelper);
+    scene.add(ambiant)
+    
     /// GUI
     
     const effectController = {
@@ -126,28 +164,120 @@ function init() {
     }
     
     const gui = new GUI();
+    const skyFolder = gui.addFolder('Sky')
     
-    gui.add(effectController, 'turbidity', 0.0, 20.0, 0.1).onChange(guiChanged);
-    gui.add(effectController, 'rayleigh', 0.0, 4, 0.001).onChange(guiChanged);
-    gui.add(effectController, 'mieCoefficient', 0.0, 0.1, 0.001).onChange(guiChanged);
-    gui.add(effectController, 'mieDirectionalG', 0.0, 1, 0.001).onChange(guiChanged);
-    gui.add(effectController, 'elevation', 0, 90, 0.1).onChange(guiChanged);
-    gui.add(effectController, 'azimuth', -180, 180, 0.1).onChange(guiChanged);
-    gui.add(effectController, 'exposure', 0, 1, 0.0001).onChange(guiChanged);
+    skyFolder.add(effectController, 'turbidity', 0.0, 20.0, 0.1).onChange(guiChanged);
+    skyFolder.add(effectController, 'rayleigh', 0.0, 4, 0.001).onChange(guiChanged);
+    skyFolder.add(effectController, 'mieCoefficient', 0.0, 0.1, 0.001).onChange(guiChanged);
+    skyFolder.add(effectController, 'mieDirectionalG', 0.0, 1, 0.001).onChange(guiChanged);
+    skyFolder.add(effectController, 'elevation', 0, 90, 0.1).onChange(guiChanged);
+    skyFolder.add(effectController, 'azimuth', -180, 180, 0.1).onChange(guiChanged);
+    skyFolder.add(effectController, 'exposure', 0, 1, 0.0001).onChange(guiChanged);
+    
+    const spotlightFolder = gui.addFolder('spotlight')
+    
+    const params = {
+        'light color': spotLight.color.getHex(),
+        intensity: spotLight.intensity,
+        distance: spotLight.distance,
+        angle: spotLight.angle,
+        penumbra: spotLight.penumbra,
+        decay: spotLight.decay,
+        focus: spotLight.shadow.focus
+    };
+    
+    spotlightFolder.addColor(params, 'light color').onChange(function (val) {
+        
+        spotLight.color.setHex(val);
+        
+    });
+    
+    spotlightFolder.add(params, 'intensity', 0, 2).onChange(function (val) {
+        
+        spotLight.intensity = val;
+        
+    });
+    
+    
+    spotlightFolder.add(params, 'distance', 50, 200).onChange(function (val) {
+        
+        spotLight.distance = val;
+        
+    });
+    
+    spotlightFolder.add(params, 'angle', 0, Math.PI / 3).onChange(function (val) {
+        
+        spotLight.angle = val;
+        
+    });
+    
+    spotlightFolder.add(params, 'penumbra', 0, 1).onChange(function (val) {
+        
+        spotLight.penumbra = val;
+        
+    });
+    
+    spotlightFolder.add(params, 'decay', 1, 2).onChange(function (val) {
+        
+        spotLight.decay = val;
+        
+    });
+    
+    spotlightFolder.add(params, 'focus', 0, 1).onChange(function (val) {
+        
+        spotLight.shadow.focus = val;
+        
+    });
+    
     
     guiChanged();
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshBasicMaterial({color: 0x00ff00});
-    const cube = new THREE.Mesh(geometry, material);
-    scene.add(cube);
+    // create an AudioListener and add it to the camera
+    const listener = new THREE.AudioListener();
+    camera.add(listener);
+    
+    // create the PositionalAudio object (passing in the listener)
+    const sound = new THREE.PositionalAudio(listener);
+    const sound2 = new THREE.PositionalAudio(listener);
+    
+    // load a sound and set it as the PositionalAudio object's buffer
+    const audioLoader = new THREE.AudioLoader();
+    audioLoader.load('audio/minecraft-lava-ambience-sound.mp3', function (buffer) {
+        sound.setBuffer(buffer);
+        sound.setRefDistance(20);
+        sound2.setRolloffFactor(1);
+        sound2.setDistanceModel("linear");
+        sound.setVolume(0.3);
+        sound.play();
+        const geometry = new THREE.BoxGeometry(1, 1, 1);
+        const material = new THREE.MeshBasicMaterial({color: 0x00ff00});
+        const cube = new THREE.Mesh(geometry, material);
+        cube.position.set(-12, 0, -24)
+        cube.add(sound)
+        scene.add(cube);
+    });
+    audioLoader.load('audio/minecraft-waterambience-sound.mp3', function (buffer) {
+        sound2.setBuffer(buffer);
+        sound2.setRefDistance(20);
+        sound2.setDistanceModel("linear");
+        sound2.setVolume(0.7);
+        sound2.play();
+        const geometry = new THREE.BoxGeometry(1, 1, 1);
+        const material = new THREE.MeshBasicMaterial({color: 0x00ff00});
+        const cube2 = new THREE.Mesh(geometry, material);
+        cube2.position.set(-3, 0, -54)
+        cube2.add(sound2)
+        scene.add(cube2);
+    });
+    
+    lavaFlat = sound
     
     
     /*CHargement des modèles complexes importés et des animations*/
-    // model
+    // Perso principal
     const loader = new FBXLoader(manager);
     loader.load('/animation/Character1.fbx', function (object) {
         
-        const anim = new FBXLoader();
+        const anim = new FBXLoader(manager);
         anim.load('/animation/Character@Walking.fbx', (anim) => {
             
             // AnimationMixer permet de jouer de jouer des animations pour un objet ciblé, ici "pers"
@@ -177,9 +307,17 @@ function init() {
         const anim4 = new FBXLoader();
         anim4.load('/animation/Character@WalkingBackwards.fbx', (anim) => {
             
-            let actions = mixer.clipAction(anim.animations[0]);
-            animationActions.push(actions)
+            backwards = mixer.clipAction(anim.animations[0]);
+            animationActions.push(backwards)
             
+        })
+        const anim5 = new FBXLoader(manager);
+        anim5.load('/animation/Character@idle.fbx', (anim) => {
+        
+            idle = mixer.clipAction(anim.animations[0]);
+            animationActions.push(idle)
+            console.log(animationActions)
+        
         })
         let scale = 0.03
         object.scale.set(scale, scale, scale);
@@ -190,69 +328,91 @@ function init() {
             }
         })
         character = object
-        // distanteCam = Caméra qui suit le personnage
-        
-        distanteCam = new THREE.Object3D;
-        character.add(distanteCam)
         scene.add(object);
         character.position.rotateY(90)
+    });
+    
+    // Personnage = Zombie
+    const loader2 = new FBXLoader(manager);
+    loader2.load('/animation/zombie.fbx', function (object) {
+        
+        const anim = new FBXLoader(manager);
+        anim.load('/animation/zombie@idle.fbx', (anim) => {
+            
+            // AnimationMixer permet de jouer de jouer des animations pour un objet ciblé, ici "pers"
+            
+            mixerZombie = new THREE.AnimationMixer(object);
+            
+            // ClipAction est un ensemble d'attributs et de sous fonctions utile à l'animation 3D de l'objet, puis qu'on range dans un tableau.
+            
+            const idle = mixerZombie.clipAction(anim.animations[0]);
+            idle.play()
+            zombieAnimations.push(idle)
+            
+        })
+        const anim2 = new FBXLoader(manager);
+        anim2.load('/animation/zombie@death.fbx', (anim) => {
+            
+            let death = mixerZombie.clipAction(anim.animations[0]);
+            death.loop = THREE.LoopOnce
+            death.clampWhenFinished = true
+            zombieAnimations.push(death)
+            
+        })
+        let scale = 0.03
+        object.scale.set(scale, scale, scale);
+        object.traverse(function (child) {
+            if (child instanceof THREE.Mesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        })
+        zombie = object
+        
+        scene.add(object);
+        // zombie.rotateY(90)
+        zombie.position.set(-5, 0, -35)
+        
+        zombieDeathSound = new THREE.PositionalAudio(listener);
+        // load a sound and set it as the PositionalAudio object's buffer
+        const audioLoader = new THREE.AudioLoader();
+        audioLoader.load('audio/codZombieYa.mp3', function (buffer) {
+            zombieDeathSound.setBuffer(buffer);
+            zombieDeathSound.setRefDistance(20);
+            zombieDeathSound.setVolume(0.3);
+            zombie.add(zombieDeathSound)
+        });
         
     });
     
     const mtlLoader = new MTLLoader(manager)
-    mtlLoader.load("./Animation/final.mtl", function (materials) {
-        materials.preload();
-        const axesHelper = new THREE.AxesHelper(20);
-        scene.add(axesHelper);
-        
-        const objLoader = new OBJLoader();
-        objLoader.setMaterials(materials);
-        objLoader.load("/Animation/final.obj", function (object) {
-            object.position.x = 0
-            object.position.y = -18
-            object.position.z = 0
-            let scale = 2
-            object.scale.set(scale, scale, scale)
-            object.traverse(function (child) {
-                if (child instanceof THREE.Mesh) {
-                    child.castShadow = true;
-                    child.receiveShadow = true;
-                }
-            });
-            
-            // scenesMeshes.push(m)
-            scene.add(object)
-            worldMap = object
-            worldOctree.fromGraphNode(object);
-        })
-    });
-    
-    
-    /*Lumières et ombres*/
-    
-    // Lumière ambiante, donne ton et couleur générale
-    let ambiant = new THREE.AmbientLight('white', 0.1)
-    
-    // Lumière dirigée qui donne des ombres
-    let spotLight = new THREE.SpotLight(0xe6a06d, 1);
-    spotLight.position.set(50, 60, -20);
-    spotLight.angle = Math.PI / 3;
-    spotLight.penumbra = 0.1;
-    spotLight.decay = 2;
-    spotLight.distance = 200;
-    spotLight.intensity = 1;
-    
-    spotLight.castShadow = true;
-    spotLight.shadow.mapSize.width = 512; // Résolution des ombres
-    spotLight.shadow.mapSize.height = 512; // Résolution des ombres
-    spotLight.shadow.camera.near = 1;
-    spotLight.shadow.camera.far = 200;
-    spotLight.shadow.focus = 1;
-    scene.add(spotLight);
-    let lightHelper = new THREE.SpotLightHelper(spotLight);
-    scene.add(lightHelper);
-    scene.add(ambiant)
-    
+     mtlLoader.load("./Animation/final.mtl", function (materials) {
+     materials.preload();
+     const axesHelper = new THREE.AxesHelper(20);
+     scene.add(axesHelper);
+     
+     const objLoader = new OBJLoader();
+     objLoader.setMaterials(materials);
+     objLoader.load("/Animation/final.obj", function (object) {
+     object.position.x = 0
+     object.position.y = -18
+     object.position.z = 0
+     let scale = 2
+     object.scale.set(scale, scale, scale)
+     object.traverse(function (child) {
+     if (child instanceof THREE.Mesh) {
+     child.castShadow = true;
+     child.receiveShadow = true;
+     }
+     });
+     
+     // scenesMeshes.push(m)
+     scene.add(object)
+     worldMap = object
+     worldOctree.fromGraphNode(object);
+     })
+     });
+
 }
 
 
@@ -288,7 +448,7 @@ function onDocumentKeyDown(event) {
         activeAnimation = 1
     }
     if (keyCode === 83) {
-        animationActions[3].play()
+        backwards.play()
         activeAnimation = 3
     }
     if (keyCode === 65) {
@@ -331,11 +491,41 @@ function onDocumentKeyUp(event) {
         animationActions[1].stop()
     }
     if (keyCode === 83) {
-        animationActions[3].stop()
+        backwards.stop()
     }
 }
 
-// Addition des vecteurs de mouvements pour la direction
+/**
+ * Vérfie si le personnage est en train de bouger. Si oui, on arrete l'animation "sur place"
+ * Si non, on lance / continue l'animation "sur place".
+ * On échappe le cas des rotation sur le côté
+ */
+function shouldIdle() {
+    let isactive = false
+    
+    for (let keyState of Object.keys(keyStates)) {
+        
+        if (keyStates[keyState] === true) {
+            if (keyState === "KeyQ" || keyState === "KeyE") {
+                return
+            }
+            isactive = true
+        }
+        
+    }
+    if (isactive === true) {
+        idle.stop()
+    } else {
+        idle.play()
+    }
+}
+
+/*** Addition des vecteurs de mouvements pour la direction ***/
+
+/**
+ * Prend la direction de la caméra pour rendre un vecteur unitaire dans sa direction
+ * @returns {THREE.Vector3} Le vecteur unitaire de la direction de la caméra (utilsiéer pour aller en avant ou en arrière)
+ */
 function getForwardVector() {
     
     camera.getWorldDirection(playerDirection);
@@ -346,6 +536,10 @@ function getForwardVector() {
     
 }
 
+/**
+ * Prend la direction de la caméra pour rendre un vecteur unitaire normal dans sa direction
+ * @returns {THREE.Vector3} Le vecteur unitaire normal de la direction de la caméra (utilsiéer pour aller à droite ou à gauche)
+ */
 function getSideVector() {
     
     camera.getWorldDirection(playerDirection);
@@ -357,12 +551,18 @@ function getSideVector() {
     
 }
 
+/**
+ * @returns {THREE.Vector3} Le vecteur pour augmenter l'élévation du perso
+ */
 function getUpVector() {
     
     return new THREE.Vector3(0, 5, 0)
     
 }
 
+/**
+ * @returns {THREE.Vector3} Le vecteur pour baisser l'élévation du perso
+ */
 function getDownVector() {
     
     return new THREE.Vector3(0, -5, 0)
@@ -465,7 +665,7 @@ function TPSCamera() {
 
 
 /* Gestion de la vue FPS  */
-document.addEventListener('mousedown', () => {
+document.addEventListener('mouseup', () => {
     document.body.requestPointerLock();
     console.log(document.pointerLockElement)
 });
@@ -475,6 +675,27 @@ document.body.addEventListener('mousemove', (event) => {
         camera.rotation.x -= event.movementY / 500;
     }
 });
+
+document.addEventListener('mousedown', (event) => {
+    if (event.button === 0) {
+        console.log("coucou left click")
+    }
+    let raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(new THREE.Vector2(), camera)
+    const objects = raycaster.intersectObjects(zombie.children);
+    if (objects.length > 0) {
+        console.log(objects)
+        
+        zombieAnimations[0].stop()
+        zombieAnimations[1].play()
+        zombieDeathSound.play()
+    }else {
+        zombieAnimations[1].stop()
+        zombieAnimations[0].play()
+    
+    }
+    
+})
 
 
 function animate() {
@@ -491,13 +712,16 @@ function animate() {
         
         // controling.update();
         character.position.y -= 2
-        console.log(character.position.y)
+        shouldIdle()
     }
     renderer.render(scene, camera)
     requestAnimationFrame(animate)
+    lightHelper.update()
+    shadowCameraHelper.update()
     
     
     mixer.update(deltaTime)
+    mixerZombie.update(deltaTime)
 }
 
 
