@@ -16,7 +16,7 @@ clock = new THREE.Clock()
 const manager = new THREE.LoadingManager();
 
 // Lumière
-let lightHelper, shadowCameraHelper, lave, lave2, spotLight, ambient
+let lightHelper, shadowCameraHelper, lave, lave2, spotLight, ambient, endingLight1,endingLight2, endingLight3
 
 // Personnage, animation et déplacements
 let character, characterLoaded
@@ -25,6 +25,7 @@ let zombieAnimations = []
 let mixer, activeAnimation
 let mixerZombie
 let chest
+let chestOpended = false
 let mixerChest
 let ouverture
 const keyStates = {};
@@ -387,6 +388,8 @@ function init() {
             
             ouverture = mixerChest.clipAction(anim.animations[0]);
             ouverture.clampWhenFinished = true
+            ouverture.timeScale = 0.2
+            ouverture.loop = THREE.LoopOnce
             
         })
         
@@ -396,12 +399,30 @@ function init() {
             if (child instanceof THREE.Mesh) {
                 child.castShadow = true;
                 child.receiveShadow = true;
+                child.geometry.computeVertexNormals();
+                child.material.metalness = 0
             }
         })
         // character.rotateY(-3)
         scene.add(object);
         chest = object
         chest.position.set(-5, 2, -45)
+        
+        endingLight1 = new THREE.PointLight(0x00FF00, 0.7, 8)
+        endingLight1.position.copy(chest.position)
+        endingLight1.position.x -= 4
+        
+        endingLight2 =  new THREE.PointLight(0x00FF00, 0.7, 8)
+        endingLight2.position.copy(chest.position)
+        endingLight2.position.x += 4
+        
+        endingLight3 =  new THREE.PointLight(0x0000FF, 0.7, 8)
+        endingLight3.position.copy(chest.position)
+        endingLight3.position.y += 2
+        
+        endingLight1.visible = endingLight2.visible = endingLight3.visible = false
+        scene.add(endingLight2, endingLight1, endingLight3)
+        
     });
     
     
@@ -495,7 +516,7 @@ function init() {
             worldOctree.fromGraphNode(object);
         })
     });
-    
+
 }
 
 
@@ -555,11 +576,7 @@ function onDocumentKeyDown(event) {
         console.log("c'est a  " + lavaFlat.getRolloffFactor())
     }
     if (keyWhich === "ControlRight") {
-        zombieAnimations[0].stop()
-        zombieAnimations[0].play()
-        console.log("wesh")
-        console.log(zombieAnimations[1])
-        console.log(keyStates)
+        console.log(character.position)
     }
     if (keyCode === 80) {
         FPSview = !FPSview
@@ -569,6 +586,7 @@ function onDocumentKeyDown(event) {
     if (keyCode === 107) {
         ouverture.play()
         console.log(ouverture)
+        endThisShit()
     }
 }
 
@@ -838,7 +856,16 @@ function zombieKill() {
 }
 
 function endThisShit(){
-
+    spotLight.visible = false
+    endingLight1.visible = true
+    endingLight2.visible = true
+    endingLight3.visible = true
+    scene.remove(ambient)
+    spotLight.color.setHex(0xffffff)
+    scene.background = new THREE.Color(0x0e1625)
+    ambient = new THREE.AmbientLight(0x0e1625, 0.6)
+    scene.add(ambient);
+    ouverture.play()
 }
 
 function animate() {
@@ -858,6 +885,11 @@ function animate() {
         shouldIdle()
         if (!zombieSpawned) {
             isZombie()
+        }
+        console.log(character.position.distanceTo(chest.position))
+        if ((character.position.distanceTo(chest.position) <6) && zombieKilled === true && chestOpended === false){
+            chestOpended = true
+            endThisShit()
         }
     }
     renderer.render(scene, camera)
