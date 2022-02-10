@@ -16,7 +16,7 @@ clock = new THREE.Clock()
 const manager = new THREE.LoadingManager();
 
 // Lumière
-let lightHelper, shadowCameraHelper, lave, lave2, spotLight, ambient, endingLight1,endingLight2, endingLight3
+let lave, lave2, spotLight, ambient, endingLight1, endingLight2, endingLight3
 
 // Personnage, animation et déplacements
 let character, characterLoaded
@@ -46,6 +46,7 @@ let FPSview = false
 
 // Framework collision
 const worldOctree = new Octree();
+// Le player collider remplacera notre personnages dans le calculs des positions
 const playerCollider = new Capsule(new THREE.Vector3(0, 0.001, 0), new THREE.Vector3(0, 1, 0), 1);
 let worldMap
 
@@ -53,6 +54,8 @@ let worldMap
 manager.onStart = function (url, itemsLoaded, itemsTotal) {
     console.log('Started loading file: ' + url + '.\nLoaded ' + itemsLoaded + ' of ' + itemsTotal + ' files.');
 };
+
+// Lors du chargement de tous les imports, on supprime la barre de progression du chargement
 manager.onLoad = function () {
     console.log('Loading complete!');
     characterLoaded = true
@@ -62,17 +65,24 @@ manager.onLoad = function () {
 };
 const elem = document.getElementById("myBar");
 const progressText = document.getElementById("progressText");
+
+// Au fur et ç mesure du chargement, on montre la progression dans le HTML barre de chargement.
 manager.onProgress = function (url, itemsLoaded, itemsTotal) {
     console.log('Loading file: ' + url + '.\nLoaded ' + itemsLoaded + ' of ' + itemsTotal + ' files.');
     elem.style.width = (itemsLoaded / itemsTotal * 100) + '%';
     progressText.innerHTML = 'Loading file: ' + url + '.\nLoaded ' + itemsLoaded + ' of ' + itemsTotal + ' files.'
     
 };
+
+// On log les éventuelles erreurs
 manager.onError = function (url) {
     console.log('There was an error loading ' + url);
 };
 
 
+/**
+ * Fonction d'initialisation de la plupart des fonctions de l'application.
+ */
 function init() {
     
     
@@ -89,27 +99,31 @@ function init() {
     // Configuration cameras
     camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 5000);
     camera.position.set(300, 10, 5);
-    camera.rotation.order = 'YXZ';
+    camera.rotation.order = 'YXZ'; // Sert à donner l'odre dans lequel les axes de la caméra doivent changer, pour la vue FPS
     
     window.addEventListener('resize', onWindowResize);
     
     
     /*
-     Camera locker sur le navigateur
+     * Camera locker sur le navigateur
+     * Le pointerLock sert à verrouiller le curseur dans le navigateur (souris ne bouge pas)
      */
     const controles = new PointerLockControls(camera, document.body);
     const blocker = document.getElementById('blocker');
     const instructions = document.getElementById('instructions');
     
+    // Si on fait click sur la fnêtre, le curseur se lock
     instructions.addEventListener('click', function () {
         controles.lock();
     });
     
+    // Lorsque le curseur est lock, les instructions disparaissent
     controles.addEventListener('lock', function () {
         instructions.style.display = 'none';
         blocker.style.display = 'none';
     });
     
+    // Lorse que le curseur est délock, les instructions réapparaissent comme un menu pause.
     controles.addEventListener('unlock', function () {
         blocker.style.display = 'block';
         instructions.style.display = '';
@@ -146,8 +160,6 @@ function init() {
     spotLight.decay = 2;
     spotLight.distance = 200;
     spotLight.intensity = 1;
-    
-    
     spotLight.castShadow = true;
     spotLight.shadow.mapSize.width = 512; // Résolution des ombres
     spotLight.shadow.mapSize.height = 512; // Résolution des ombres
@@ -155,17 +167,15 @@ function init() {
     spotLight.shadow.camera.far = 200;
     spotLight.shadow.focus = 1;
     scene.add(spotLight);
-    lightHelper = new THREE.SpotLightHelper(spotLight);
-    scene.add(lightHelper);
-    shadowCameraHelper = new THREE.CameraHelper(spotLight.shadow.camera);
-    scene.add(shadowCameraHelper);
     scene.add(ambient)
     
+    // Lumière associée à la lave latérale
     lave = new THREE.PointLight(0x821b0a, 0.7, 8)
     lave.position.set(-13, 2, -26)
     lave.castShadow = true;
     scene.add(lave)
     
+    // Lumière associée à la lave du fond
     lave2 = new THREE.PointLight(0x821b0a, 0.7, 8)
     lave2.position.set(-4, 2, -50)
     lave2.castShadow = true;
@@ -174,65 +184,13 @@ function init() {
     /// GUI
     
     const gui = new GUI();
-    const spotlightFolder = gui.addFolder('spotlight')
-    
-    const params = {
-        'light color': spotLight.color.getHex(),
-        intensity: spotLight.intensity,
-        distance: spotLight.distance,
-        angle: spotLight.angle,
-        penumbra: spotLight.penumbra,
-        decay: spotLight.decay,
-        focus: spotLight.shadow.focus
-    };
-    
-    spotlightFolder.addColor(params, 'light color').onChange(function (val) {
-        
-        spotLight.color.setHex(val);
-        
-    });
-    
-    spotlightFolder.add(params, 'intensity', 0, 2).onChange(function (val) {
-        
-        spotLight.intensity = val;
-        
-    });
-    
-    
-    spotlightFolder.add(params, 'distance', 50, 200).onChange(function (val) {
-        
-        spotLight.distance = val;
-        
-    });
-    
-    spotlightFolder.add(params, 'angle', 0, Math.PI / 3).onChange(function (val) {
-        
-        spotLight.angle = val;
-        
-    });
-    
-    spotlightFolder.add(params, 'penumbra', 0, 1).onChange(function (val) {
-        
-        spotLight.penumbra = val;
-        
-    });
-    
-    spotlightFolder.add(params, 'decay', 1, 2).onChange(function (val) {
-        
-        spotLight.decay = val;
-        
-    });
-    
-    spotlightFolder.add(params, 'focus', 0, 1).onChange(function (val) {
-        
-        spotLight.shadow.focus = val;
-        
-    });
     
     let time = 18
     const parametre = {
         time: time
     }
+    
+    // Fonction qui change la position de la lumière et sa couleur en fonction du temps
     gui.add(parametre, 'time', 0, 24).onChange(function (val) {
         spotLight.position.x = -100 + (8.333333 * val)
         spotLight.position.y = 60
@@ -274,15 +232,15 @@ function init() {
         }
     })
     
-    // create an AudioListener and add it to the camera
+    // Créons un audio listener pour l'ajouter à la caméra.
     const listener = new THREE.AudioListener();
     camera.add(listener);
     
-    // create the PositionalAudio object (passing in the listener)
+    // On créée des audios positionnés par rapport à la caméra (listener). Cela permet d'orienter le son en fonction de sa distance et position
     const sound = new THREE.PositionalAudio(listener);
     const sound2 = new THREE.PositionalAudio(listener);
     
-    // load a sound and set it as the PositionalAudio object's buffer
+    // On charge un son que l'on ajoute à la fonction audion positionné
     const audioLoader = new THREE.AudioLoader();
     audioLoader.load('audio/minecraft-lava-ambience-sound.mp3', function (buffer) {
         sound.setBuffer(buffer);
@@ -297,6 +255,7 @@ function init() {
         cube.position.set(-12, 0, -24)
         cube.add(sound)
         scene.add(cube);
+        cube.visible = false
     });
     audioLoader.load('audio/minecraft-waterambience-sound.mp3', function (buffer) {
         sound2.setBuffer(buffer);
@@ -310,12 +269,14 @@ function init() {
         cube2.position.set(3, 0, -35)
         cube2.add(sound2)
         scene.add(cube2);
+        cube2.visible = false
     });
     
     lavaFlat = sound
     
     
     /*CHargement des modèles complexes importés et des animations*/
+    
     // Perso principal
     const loader = new FBXLoader(manager);
     loader.load('/animation/Character1.fbx', function (object) {
@@ -328,6 +289,7 @@ function init() {
             mixer = new THREE.AnimationMixer(object);
             
             // ClipAction est un ensemble d'attributs et de sous fonctions utile à l'animation 3D de l'objet, puis qu'on range dans un tableau.
+            // Les animations sont associées à un mixer, lui-même associé à un modèle (ici character, notre personnage)
             
             const forwardWalk = mixer.clipAction(anim.animations[0]);
             animationActions.push(forwardWalk)
@@ -352,7 +314,6 @@ function init() {
                             
                             let actions = mixer.clipAction(anim.animations[0]);
                             animationActions.push(actions)
-                            console.log(animationActions)
                             
                         })
                     })
@@ -360,8 +321,11 @@ function init() {
             })
         })
         
+        // Donne la taille de l'objet ( à trois centième)
         let scale = 0.03
         object.scale.set(scale, scale, scale);
+        
+        // Pour chaque sous objet qui compose l'objet, on va s'assurer qu'il peut intéragir avec les ombres (recevoir) et en produire
         object.traverse(function (child) {
             if (child instanceof THREE.Mesh) {
                 child.castShadow = true;
@@ -370,10 +334,10 @@ function init() {
         })
         character = object
         character.animations[0] = animationActions[4]
-        // character.rotateY(-3)
         scene.add(object);
     });
     
+    // On importe le coffre
     const loader3 = new FBXLoader(manager);
     loader3.load('/animation/Chest.fbx', function (object) {
         const anim = new FBXLoader(manager);
@@ -399,27 +363,26 @@ function init() {
             if (child instanceof THREE.Mesh) {
                 child.castShadow = true;
                 child.receiveShadow = true;
-                child.geometry.computeVertexNormals();
-                child.material.metalness = 0
             }
         })
-        // character.rotateY(-3)
         scene.add(object);
         chest = object
         chest.position.set(-5, 2, -45)
         
+        // Lors de la fin du projet, on va positionner 3 PointsLights (comme des lucioles) autour du coffre
         endingLight1 = new THREE.PointLight(0x00FF00, 0.7, 8)
         endingLight1.position.copy(chest.position)
         endingLight1.position.x -= 4
         
-        endingLight2 =  new THREE.PointLight(0x00FF00, 0.7, 8)
+        endingLight2 = new THREE.PointLight(0x00FF00, 0.7, 8)
         endingLight2.position.copy(chest.position)
         endingLight2.position.x += 4
         
-        endingLight3 =  new THREE.PointLight(0x0000FF, 0.7, 8)
+        endingLight3 = new THREE.PointLight(0x0000FF, 0.7, 8)
         endingLight3.position.copy(chest.position)
         endingLight3.position.y += 2
         
+        // On s'assure que les lumières ne soient visibles qu'à la fin du projet.
         endingLight1.visible = endingLight2.visible = endingLight3.visible = false
         scene.add(endingLight2, endingLight1, endingLight3)
         
@@ -447,8 +410,9 @@ function init() {
         anim2.load('/animation/zombie@death.fbx', (anim) => {
             
             let death = mixerZombie.clipAction(anim.animations[0]);
-            death.loop = THREE.LoopOnce
-            death.clampWhenFinished = true
+            // Les deux prochaines lignes permettent
+            death.loop = THREE.LoopOnce // Permet de jouer l'animation qu'une seule fois
+            death.clampWhenFinished = true // Permet de freeze le personnage sur la dernière image de l'animation (éviter la T-Pose à la fin de l'animation)
             zombieAnimations.push(death)
             
         })
@@ -463,13 +427,12 @@ function init() {
         zombie = object
         
         scene.add(object);
-        // zombie.rotateY(90)
         zombie.position.set(-5, 0, -35)
         zombie.visible = false
         
         zombieDeathSound = new THREE.PositionalAudio(listener);
         
-        // load a sound and set it as the PositionalAudio object's buffer
+        // On charge un son qui sera le rale d'agonie du zombie (donc on l'ajoute au zombie pour la position.
         const audioLoader = new THREE.AudioLoader();
         audioLoader.load('audio/codZombieYa.mp3', function (buffer) {
             zombieDeathSound.setBuffer(buffer);
@@ -516,10 +479,12 @@ function init() {
             worldOctree.fromGraphNode(object);
         })
     });
-
+    
 }
 
-
+/**
+ * Permet de rezdimensionner l'image de rendu à chaque modification de la résolution / ratio d'aspect de la fenêtre
+ */
 function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
@@ -533,8 +498,18 @@ document.addEventListener("keydown", onDocumentKeyDown, false);
 
 document.addEventListener("keyup", onDocumentKeyUp, false);
 
+/**
+ * Gère les comportements associées aux touches.
+ *
+ * Dans event.code ou event.which, on récupère la touche appuyé.
+ * A l'aide de if, on joue certaines animations en fonction de et on joue aussi les fonctions de vecteurs mouvement.
+ * @param event
+ */
 function onDocumentKeyDown(event) {
+    
+    // Sert pour la fonction controls qui gère les vercteurs, on range les touches appuyés dans un array référencé dans controls
     keyStates[event.code] = true;
+    
     let keyCode = event.which;
     let keyWhich = event.code
     if (keyCode === 0x0D) {
@@ -557,7 +532,6 @@ function onDocumentKeyDown(event) {
     }
     if (keyCode === 65) {
         character.rotateY(rotationY)
-        console.log("bah coucou")
     }
     if (keyCode === 69) {
         character.rotateY(-rotationY)
@@ -590,6 +564,13 @@ function onDocumentKeyDown(event) {
     }
 }
 
+/**
+ * Gère les comportements associées aux touches.
+ *
+ * Dans event.code ou event.which, on récupère la touche lachée.
+ * A l'aide de if, on stop les animations pour les touches lachées.
+ * @param event
+ */
 function onDocumentKeyUp(event) {
     keyStates[event.code] = false;
     let keyCode = event.which;
@@ -610,9 +591,11 @@ function onDocumentKeyUp(event) {
 }
 
 /**
- * Vérfie si le personnage est en train de bouger. Si oui, on arrete l'animation "sur place"
- * Si non, on lance / continue l'animation "sur place".
- * On échappe le cas des rotation sur le côté
+ * Vérfie si le personnage est en train de bouger à l'aide du tableau keyStates (qui donne les touches appuyées.
+ * Si oui, on arrete l'animation "idle (ne fait rien sur place)"
+ * Si non, on lance / continue l'animation "idle".
+ *
+ * On échappe le cas des rotation sur le côté avec les touches A E
  */
 function shouldIdle() {
     let isactive = false
@@ -642,9 +625,9 @@ function shouldIdle() {
  */
 function getForwardVector() {
     
-    camera.getWorldDirection(playerDirection);
-    playerDirection.y = 0;
-    playerDirection.normalize();
+    camera.getWorldDirection(playerDirection);  // donne là où regarde la caméra
+    playerDirection.y = 0;                      // on enlève tout mouvement en y qui nous intéresse pas (c''est le travail de la gravité
+    playerDirection.normalize();                // On normalise le vecteur (le rendre vecteur unitaire, distance de 1)
     
     return playerDirection;
     
@@ -659,7 +642,7 @@ function getSideVector() {
     camera.getWorldDirection(playerDirection);
     playerDirection.y = 0;
     playerDirection.normalize();
-    playerDirection.cross(camera.up);
+    playerDirection.cross(camera.up);           // On prend le vecteur et renvoie sa perpendiculaire pour avancer sur les côtés
     
     return playerDirection;
     
@@ -670,12 +653,12 @@ function getSideVector() {
  */
 function getUpVector() {
     
-    return new THREE.Vector3(0, 5, 0)
+    return new THREE.Vector3(0, 5, 0)   // Un vecteur qui ne pointe qu'en hauteur pour sauter
     
 }
 
 /**
- * @returns {THREE.Vector3} Le vecteur pour baisser l'élévation du perso
+ * @returns {THREE.Vector3} Le vecteur pour baisser l'élévation du perso (seulement en debug)
  */
 function getDownVector() {
     
@@ -683,6 +666,11 @@ function getDownVector() {
     
 }
 
+
+/**
+ * Fonction qui utilises le tableau keyStates où sont rangées toutes les touches appuyées,
+ * pour savoir quels mouvements le personnages doit effectuer.
+ */
 function controls() {
     const speedDelta = 1
     playerVelocity.set(0, 0, 0)
@@ -729,41 +717,65 @@ function controls() {
 
 /*** Système de collision ***/
 
+/**
+ * Fonction Octree qui va verifier si le playerCollider (capsule simulant le personnage) touche un élément du monde Octree
+ */
 function playerCollisions() {
     
+    // On effectue la vérification des collisions
     const result = worldOctree.capsuleIntersect(playerCollider);
+    
+    // On range dans le playerCollider la position du personnage
     if (result) {
         playerCollider.translate(result.normal.multiplyScalar(result.depth));
     }
     
 }
 
+/**
+ * Fonction qui gère le déplacement du personnage en fonction de la gravité et des collisions.
+ * @param deltaTime
+ */
 function updatePlayer(deltaTime) {
     
-    // const result = world.capsuleIntersect(character);
     playerVelocity.add(playerVelocity);
     
-    // Gravité
+    // Gravité : On retire un valeur à la position y du personnage (relativisée par le deltaTime)
     if (gravityOn === true) {
         playerVelocity.y -= GRAVITY * deltaTime
     }
     
-    // Respwan si on tombe en el vido
+    // On range dans deltaPosition tous les vecteurs de mouvements additionés dans la fonction controls()
     const deltaPosition = playerVelocity.clone().multiplyScalar(deltaTime * 5);
+    
+    // Respwan si on tombe en el vido
     if (character.position.y < -30) {
         deltaPosition.y = Math.abs(character.position.y) + 10
     }
+    
+    /*On ajoute dans playerCollider (notre capsule représentant la position du personnage)
+     tous les mouvements du personnages avec le traitement de la gravité*/
     playerCollider.translate(deltaPosition);
     
+    /*On joue les collisions avec la positions post mouvement de notre personnage pour savoir si il doit être retenu par un mur
+     Player position range dans playerCollider la position finale du personnage en fonction des collisions.
+     On range dans la position du personnage cette position finale.
+     */
     playerCollisions();
-    // character.position.add(deltaPosition);
     character.position.copy(playerCollider.end);
+    
+    // Si la caméra est en vue FPS, c'est la caméra qui prend les positions du personnage
     if (FPSview) {
         camera.position.copy(playerCollider.end)
     }
     
 }
 
+/**
+ * On calcule la position de la caméra par rapport au personnage.
+ * La caméra est lockée sur le personnage
+ * On calcule la position de où la caméra doit regarder, qui est un peu à droite du personnage pour une caméra plus TPS
+ */
 function TPSCamera() {
     
     const idealOffset = new THREE.Vector3(-2, 4, -5);
@@ -855,7 +867,13 @@ function zombieKill() {
     spotLight.position.z = 40 + (-3.33333 * 16)
 }
 
-function endThisShit(){
+/**
+ * Quand on a finis avec tout ça (ouf enfin j'en peux plus)
+ * On désactive la lumière du soleil pour un effet, on fait apparaitre les spotlight du coffre et on l'ouvre.
+ *
+ * ET ON SE CASSE MAINTENANT C'EST FINI BYE.
+ */
+function endThisShit() {
     spotLight.visible = false
     endingLight1.visible = true
     endingLight2.visible = true
@@ -871,6 +889,7 @@ function endThisShit(){
 function animate() {
     deltaTime = clock.getDelta()
     
+    // On n'effectue la plupart des calculs que si tous les modèles ont été chargés
     if (characterLoaded) {
         controls()
         updatePlayer(deltaTime)
@@ -880,24 +899,24 @@ function animate() {
             camera.position.y += 3
         }
         
-        // controling.update();
-        character.position.y -= 2
-        shouldIdle()
+        character.position.y -= 2   // repositionne le personnage pour éviter le clipping dans le sol après le calcul des collisions
+        shouldIdle()                // Est-ce que le personnage doit jouer son animation Idle
+        
+        // Condition pour fairz apparaitre le zombie (on ne l'a joue que si il n'est jamais apparu
         if (!zombieSpawned) {
             isZombie()
         }
-        console.log(character.position.distanceTo(chest.position))
-        if ((character.position.distanceTo(chest.position) <6) && zombieKilled === true && chestOpended === false){
+        
+        // On joue la fin du jeu seulement si le zombie a été tué et si le personnage est assez proche.
+        if ((character.position.distanceTo(chest.position) < 6) && zombieKilled === true && chestOpended === false) {
             chestOpended = true
             endThisShit()
         }
     }
     renderer.render(scene, camera)
     requestAnimationFrame(animate)
-    lightHelper.update()
-    shadowCameraHelper.update()
     
-    
+    // Les mixers update permettent de mettre à jour les animations.
     mixer.update(deltaTime)
     mixerZombie.update(deltaTime)
     mixerChest.update(deltaTime)
