@@ -16,7 +16,7 @@ clock = new THREE.Clock()
 const manager = new THREE.LoadingManager();
 
 // Lumière
-let lightHelper, shadowCameraHelper, lave, lave2, spotLight,ambient
+let lightHelper, shadowCameraHelper, lave, lave2, spotLight, ambient
 
 // Personnage, animation et déplacements
 let character, characterLoaded
@@ -26,7 +26,7 @@ let mixer, activeAnimation
 let mixerZombie
 let chest
 let mixerChest
-let ouverture, fermeture
+let ouverture
 const keyStates = {};
 let animationActions = []
 const playerDirection = new THREE.Vector3();
@@ -456,9 +456,9 @@ function init() {
             zombieDeathSound.setVolume(0.3);
             zombie.add(zombieDeathSound)
         });
-    
+        
         ominousMusic = new THREE.PositionalAudio(listener);
-    
+        
         const audioLoader2 = new THREE.AudioLoader();
         audioLoader2.load('audio/naruto-nervous.mp3', function (buffer) {
             ominousMusic.setBuffer(buffer);
@@ -473,8 +473,6 @@ function init() {
     const mtlLoader = new MTLLoader(manager)
     mtlLoader.load("./Animation/final.mtl", function (materials) {
         materials.preload();
-        const axesHelper = new THREE.AxesHelper(20);
-        scene.add(axesHelper);
         
         const objLoader = new OBJLoader();
         objLoader.setMaterials(materials);
@@ -765,7 +763,6 @@ function TPSCamera() {
 /* Gestion de la vue FPS  */
 document.addEventListener('mouseup', () => {
     document.body.requestPointerLock();
-    console.log(document.pointerLockElement)
 });
 document.body.addEventListener('mousemove', (event) => {
     if (document.pointerLockElement === document.body) {
@@ -775,24 +772,23 @@ document.body.addEventListener('mousemove', (event) => {
 });
 
 document.addEventListener('mousedown', (event) => {
-    if (event.button === 0) {
-        console.log("coucou left click")
+    /*
+     * Ce code ne joue que si le bouton gauche de la souris est pressé, si le zombie a bien spawn
+     * et si le zombie n'a pas encore été tué.
+     */
+    if (event.button === 0 && zombieSpawned && !zombieKilled) {
+        console.log("pian")
+        let raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(new THREE.Vector2(), camera)
+        const objects = raycaster.intersectObjects(zombie.children);
+        if (objects.length > 0) {
+            zombieAnimations[1].play()
+            zombieAnimations[0].crossFadeTo(zombieAnimations[1])
+            zombieDeathSound.play()
+            zombieKill()
+        }
     }
-    let raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(new THREE.Vector2(), camera)
-    const objects = raycaster.intersectObjects(zombie.children);
-    if (objects.length > 0) {
-        console.log(objects)
-        
-        // zombieAnimations[0].stop()
-        zombieAnimations[1].play()
-        zombieAnimations[0].crossFadeTo(zombieAnimations[1])
-        zombieDeathSound.play()
-    } else {
-        zombieAnimations[1].stop()
-        zombieAnimations[0].play()
-        
-    }
+    
     
 })
 
@@ -822,6 +818,27 @@ function spawnZombie() {
     scene.background = new THREE.Color(0x0e1625)
     ambient = new THREE.AmbientLight(0x0e1625, 0.1)
     scene.add(ambient);
+}
+
+/**
+ * Gère le meurte du zombie.
+ * Provoque sa disparation, l'arrêt de la musique creepy et le retour des lumière au normal.
+ **/
+function zombieKill() {
+    zombieKilled = true
+    ominousMusic.stop()
+    scene.remove(ambient)
+    spotLight.color.setHex(0xe6a06d)
+    scene.background = new THREE.Color(0xe6a06d)
+    ambient = new THREE.AmbientLight(0xe6a06d, 0.1)
+    scene.add(ambient);
+    spotLight.position.x = -100 + (8.333333 * 16)
+    spotLight.position.y = 60
+    spotLight.position.z = 40 + (-3.33333 * 16)
+}
+
+function endThisShit(){
+
 }
 
 function animate() {
