@@ -16,11 +16,11 @@ clock = new THREE.Clock()
 const manager = new THREE.LoadingManager();
 
 // Lumière
-let lightHelper, shadowCameraHelper, lave, lave2
+let lightHelper, shadowCameraHelper, lave, lave2, ambient, spotLight
 
 // Personnage, animation et déplacements
 let character, characterLoaded
-let zombie
+let zombie, zombieSpawned, zombieKilled
 let zombieAnimations = []
 let mixer, activeAnimation
 let mixerZombie
@@ -36,7 +36,7 @@ let gravityOn = false
 let rotationY = 0.15
 
 // Audio
-let lavaFlat, zombieDeathSound
+let lavaSound, waterSound, zombieDeathSound, ominousMusic
 
 // Caméra
 let camera
@@ -135,10 +135,10 @@ function init() {
     /*Lumières et ombres*/
     
     // Lumière ambiante, donne ton et couleur générale
-    let ambient = new THREE.AmbientLight('white', 0.1)
+    ambient = new THREE.AmbientLight('white', 0.1)
     
     // Lumière dirigée qui donne des ombres
-    let spotLight = new THREE.SpotLight(0xe6a06d, 1);
+    spotLight = new THREE.SpotLight(0xe6a06d, 1);
     spotLight.position.set(50, 60, -20);
     spotLight.angle = Math.PI / 3;
     spotLight.penumbra = 0.1;
@@ -278,40 +278,38 @@ function init() {
     camera.add(listener);
     
     // create the PositionalAudio object (passing in the listener)
-    const sound = new THREE.PositionalAudio(listener);
-    const sound2 = new THREE.PositionalAudio(listener);
+    lavaSound = new THREE.PositionalAudio(listener);
+    waterSound = new THREE.PositionalAudio(listener);
     
     // load a sound and set it as the PositionalAudio object's buffer
     const audioLoader = new THREE.AudioLoader();
     audioLoader.load('audio/minecraft-lava-ambience-sound.mp3', function (buffer) {
-        sound.setBuffer(buffer);
-        sound.setRefDistance(20);
-        sound.setRolloffFactor(1);
-        sound.setDistanceModel("linear");
-        sound.setVolume(0.3);
-        sound.play();
+        lavaSound.setBuffer(buffer);
+        lavaSound.setRefDistance(20);
+        lavaSound.setRolloffFactor(1);
+        lavaSound.setDistanceModel("linear");
+        lavaSound.setVolume(0.3);
+        lavaSound.play();
         const geometry = new THREE.BoxGeometry(1, 1, 1);
         const material = new THREE.MeshBasicMaterial({color: 0x00ff00});
         const cube = new THREE.Mesh(geometry, material);
         cube.position.set(-12, 0, -24)
-        cube.add(sound)
+        cube.add(lavaSound)
         scene.add(cube);
     });
     audioLoader.load('audio/minecraft-waterambience-sound.mp3', function (buffer) {
-        sound2.setBuffer(buffer);
-        sound2.setRefDistance(20);
-        sound2.setDistanceModel("linear");
-        sound2.setVolume(0.7);
-        sound2.play();
+        waterSound.setBuffer(buffer);
+        waterSound.setRefDistance(20);
+        waterSound.setDistanceModel("linear");
+        waterSound.setVolume(0.7);
+        waterSound.play();
         const geometry = new THREE.BoxGeometry(1, 1, 1);
         const material = new THREE.MeshBasicMaterial({color: 0x00ff00});
         const cube2 = new THREE.Mesh(geometry, material);
         cube2.position.set(3, 0, -35)
-        cube2.add(sound2)
+        cube2.add(waterSound)
         scene.add(cube2);
     });
-    
-    lavaFlat = sound
     
     
     /*CHargement des modèles complexes importés et des animations*/
@@ -368,6 +366,7 @@ function init() {
             }
         })
         character = object
+        character.rotation.y = Math.PI
         character.animations[0] = animationActions[4]
         // character.rotateY(-3)
         scene.add(object);
@@ -386,6 +385,21 @@ function init() {
             // ClipAction est un ensemble d'attributs et de sous fonctions utile à l'animation 3D de l'objet, puis qu'on range dans un tableau.
             
             ouverture = mixerChest.clipAction(anim.animations[0]);
+            ouverture.loop = THREE.LoopOnce
+            
+        })
+        
+        const anim2 = new FBXLoader(manager);
+        
+        anim2.load('/animation/Chest_Ouverture.fbx', (anim) => {
+            
+            // AnimationMixer permet de jouer de jouer des animations pour un objet ciblé, ici "pers"
+            
+            
+            // ClipAction est un ensemble d'attributs et de sous fonctions utile à l'animation 3D de l'objet, puis qu'on range dans un tableau.
+            
+            fermeture = mixerChest.clipAction(anim.animations[0]);
+            fermeture.loop = THREE.LoopOnce
             
         })
         
@@ -443,6 +457,7 @@ function init() {
         scene.add(object);
         // zombie.rotateY(90)
         zombie.position.set(-5, 0, -35)
+        zombie.visible = false
         
         zombieDeathSound = new THREE.PositionalAudio(listener);
         
@@ -453,6 +468,21 @@ function init() {
             zombieDeathSound.setRefDistance(20);
             zombieDeathSound.setVolume(0.3);
             zombie.add(zombieDeathSound)
+        });
+        zombieDeathSound.onended = function () {
+            console.log('sound1 ended');
+        };
+        
+        const audioLoader2 = new THREE.AudioLoader();
+        
+        ominousMusic = new THREE.PositionalAudio(listener);
+        
+        audioLoader2.load('audio/naruto-nervous.mp3', function (buffer) {
+            ominousMusic.setBuffer(buffer);
+            ominousMusic.setRefDistance(20);
+            ominousMusic.setDistanceModel("linear");
+            ominousMusic.setVolume(0.2);
+            zombie.add(ominousMusic)
         });
         
     });
@@ -484,7 +514,6 @@ function init() {
             worldOctree.fromGraphNode(object);
         })
     });
-    
 }
 
 
@@ -540,8 +569,8 @@ function onDocumentKeyDown(event) {
     if (keyWhich === "ShiftRight") {
         console.log(character.position)
         character.visible = !character.visible
-        console.log("le volume est à " + lavaFlat.getDistanceModel())
-        console.log("c'est a  " + lavaFlat.getRolloffFactor())
+        console.log("le volume est à " + lavaSound.getDistanceModel())
+        console.log("c'est a  " + lavaSound.getRolloffFactor())
     }
     if (keyWhich === "ControlRight") {
         zombieAnimations[0].stop()
@@ -556,8 +585,14 @@ function onDocumentKeyDown(event) {
         console.log("FPS view : turned to " + FPSview)
     }
     if (keyCode === 107) {
+        fermeture.stop()
         ouverture.play()
         console.log(ouverture)
+    }
+    if (keyCode === 109) {
+        ouverture.stop()
+        fermeture.play()
+        isZombie()
     }
 }
 
@@ -654,6 +689,12 @@ function getDownVector() {
     
 }
 
+/**
+ * Aggrège tous les vecteurs de mouvement.
+ *
+ * Calcule le mouvement du personnage en, fonction de tous les vecteurs additionnés.
+ * Les vecteurs sont pesé en fonction du temps d'action de la touche.
+ */
 function controls() {
     const speedDelta = 1
     playerVelocity.set(0, 0, 0)
@@ -735,6 +776,11 @@ function updatePlayer(deltaTime) {
     
 }
 
+/**
+ * Gère la caméra troisième personne.
+ *
+ * Place constemment la caméra derrière le personnage et tourne cette caméra dynamiquement.
+ */
 function TPSCamera() {
     
     const idealOffset = new THREE.Vector3(-2, 4, -5);
@@ -762,26 +808,75 @@ document.body.addEventListener('mousemove', (event) => {
 });
 
 document.addEventListener('mousedown', (event) => {
-    if (event.button === 0) {
+    /*Ce code ne joue que si le bouton gauche de la souris est pressé, si le zombie a bien spawn
+     et si le zombie n'a pas encore été tué.*/
+    if (event.button === 0 && zombieSpawned && !zombieKilled) {
         console.log("coucou left click")
-    }
-    let raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(new THREE.Vector2(), camera)
-    const objects = raycaster.intersectObjects(zombie.children);
-    if (objects.length > 0) {
-        console.log(objects)
-        
-        // zombieAnimations[0].stop()
-        zombieAnimations[1].play()
-        zombieAnimations[0].crossFadeTo(zombieAnimations[1])
-        zombieDeathSound.play()
-    } else {
-        zombieAnimations[1].stop()
-        zombieAnimations[0].play()
-        
+        let raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(new THREE.Vector2(), camera)
+        const objects = raycaster.intersectObjects(zombie.children);
+        if (objects.length > 0) {
+            console.log(objects)
+            
+            // zombieAnimations[0].stop()
+            zombieAnimations[1].play()
+            zombieAnimations[0].crossFadeTo(zombieAnimations[1])
+            zombieDeathSound.play()
+            zombieKill()
+        } else {
+            zombieAnimations[1].stop()
+            zombieAnimations[0].play()
+            
+        }
     }
     
 })
+
+/**
+ * Gère quand le zombie doit apparaître.
+ * Il apparait en fonctiond la distance entre lui et le personnage.
+ */
+function isZombie() {
+    if (character.position.distanceTo(zombie.position) < 13) {
+        spawnZombie()
+    }
+}
+
+
+/**
+ * Gère l'apparation du zombie.
+ * Provoque son apparition, joue la musique creepy et change les lumière pour une ambiance oppressante.
+ */
+function spawnZombie() {
+    zombieSpawned = true
+    zombie.visible = true
+    ominousMusic.play()
+    scene.remove(ambient)
+    spotLight.position.copy(zombie.position)
+    spotLight.position.y = 6
+    spotLight.position.z -= 10
+    spotLight.lookAt(zombie.position)
+    scene.background = new THREE.Color(0x0e1625)
+    ambient = new THREE.AmbientLight(0x0e1625, 0.1)
+    scene.add(ambient);
+}
+
+/**
+ * Gère le meurte du zombie.
+ * Provoque sa disparation, l'arrêt de la musique creepy et le retour des lumière au normal.
+ */
+function zombieKill() {
+    zombieKilled = true
+    ominousMusic.stop()
+    scene.remove(ambient)
+    spotLight.color.setHex(0xe6a06d)
+    scene.background = new THREE.Color(0xe6a06d)
+    ambient = new THREE.AmbientLight(0xe6a06d, 0.1)
+    scene.add(ambient);
+    spotLight.position.x = -100 + (8.333333 * 16)
+    spotLight.position.y = 60
+    spotLight.position.z = 40 + (-3.33333 * 16)
+}
 
 
 function animate() {
@@ -799,6 +894,9 @@ function animate() {
         // controling.update();
         character.position.y -= 2
         shouldIdle()
+        if (!zombieSpawned) {
+            isZombie()
+        }
     }
     renderer.render(scene, camera)
     requestAnimationFrame(animate)
