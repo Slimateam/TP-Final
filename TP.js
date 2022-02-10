@@ -16,11 +16,11 @@ clock = new THREE.Clock()
 const manager = new THREE.LoadingManager();
 
 // Lumière
-let lightHelper, shadowCameraHelper, lave, lave2
+let lightHelper, shadowCameraHelper, lave, lave2, spotLight,ambient
 
 // Personnage, animation et déplacements
 let character, characterLoaded
-let zombie
+let zombie, zombieSpawned, zombieKilled
 let zombieAnimations = []
 let mixer, activeAnimation
 let mixerZombie
@@ -36,7 +36,7 @@ let gravityOn = false
 let rotationY = 0.15
 
 // Audio
-let lavaFlat, zombieDeathSound
+let lavaFlat, zombieDeathSound, ominousMusic
 
 // Caméra
 let camera
@@ -135,10 +135,10 @@ function init() {
     /*Lumières et ombres*/
     
     // Lumière ambiante, donne ton et couleur générale
-    let ambient = new THREE.AmbientLight('white', 0.1)
+    ambient = new THREE.AmbientLight('white', 0.1)
     
     // Lumière dirigée qui donne des ombres
-    let spotLight = new THREE.SpotLight(0xe6a06d, 1);
+    spotLight = new THREE.SpotLight(0xe6a06d, 1);
     spotLight.position.set(50, 60, -20);
     spotLight.angle = Math.PI / 3;
     spotLight.penumbra = 0.1;
@@ -377,7 +377,7 @@ function init() {
     loader3.load('/animation/Chest.fbx', function (object) {
         const anim = new FBXLoader(manager);
         
-        anim.load('/animation/Chest_Close.fbx', (anim) => {
+        anim.load('/animation/Chest_Ouverture.fbx', (anim) => {
             
             // AnimationMixer permet de jouer de jouer des animations pour un objet ciblé, ici "pers"
             
@@ -386,6 +386,7 @@ function init() {
             // ClipAction est un ensemble d'attributs et de sous fonctions utile à l'animation 3D de l'objet, puis qu'on range dans un tableau.
             
             ouverture = mixerChest.clipAction(anim.animations[0]);
+            ouverture.clampWhenFinished = true
             
         })
         
@@ -443,6 +444,7 @@ function init() {
         scene.add(object);
         // zombie.rotateY(90)
         zombie.position.set(-5, 0, -35)
+        zombie.visible = false
         
         zombieDeathSound = new THREE.PositionalAudio(listener);
         
@@ -453,6 +455,17 @@ function init() {
             zombieDeathSound.setRefDistance(20);
             zombieDeathSound.setVolume(0.3);
             zombie.add(zombieDeathSound)
+        });
+    
+        ominousMusic = new THREE.PositionalAudio(listener);
+    
+        const audioLoader2 = new THREE.AudioLoader();
+        audioLoader2.load('audio/naruto-nervous.mp3', function (buffer) {
+            ominousMusic.setBuffer(buffer);
+            ominousMusic.setRefDistance(20);
+            ominousMusic.setDistanceModel("linear");
+            ominousMusic.setVolume(0.2);
+            zombie.add(ominousMusic)
         });
         
     });
@@ -783,6 +796,33 @@ document.addEventListener('mousedown', (event) => {
     
 })
 
+/**
+ * Gère quand le zombie doit apparaître.
+ * Il apparait en fonctiond la distance entre lui et le personnage.
+ */
+function isZombie() {
+    if (character.position.distanceTo(zombie.position) < 13) {
+        spawnZombie()
+    }
+}
+
+/**
+ * Gère l'apparation du zombie.
+ * Provoque son apparition, joue la musique creepy et change les lumière pour une ambiance oppressante.
+ */
+function spawnZombie() {
+    zombieSpawned = true
+    zombie.visible = true
+    ominousMusic.play()
+    scene.remove(ambient)
+    spotLight.position.copy(zombie.position)
+    spotLight.position.y = 6
+    spotLight.position.z -= 10
+    spotLight.lookAt(zombie.position)
+    scene.background = new THREE.Color(0x0e1625)
+    ambient = new THREE.AmbientLight(0x0e1625, 0.1)
+    scene.add(ambient);
+}
 
 function animate() {
     deltaTime = clock.getDelta()
@@ -799,6 +839,9 @@ function animate() {
         // controling.update();
         character.position.y -= 2
         shouldIdle()
+        if (!zombieSpawned) {
+            isZombie()
+        }
     }
     renderer.render(scene, camera)
     requestAnimationFrame(animate)
